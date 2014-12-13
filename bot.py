@@ -22,9 +22,7 @@ def phonebook(message):
     return irc.Response('https://docs.google.com/spreadsheets/d/1dsoA_emnkmuroDZV9plDVPY-pQBtaUcnxLcaXQ7g06Y/')
 
 def toc(message):
-    if message.nick in conf.get('owners', []):
-        return irc.Response('https://docs.google.com/spreadsheets/d/1uYu-dk8-HjQt98fEoJ5G2VndUF-AqKW5bEHtAo7oKeM/', pm_user=True)
-    return None
+    return irc.Response('https://docs.google.com/spreadsheets/d/1uYu-dk8-HjQt98fEoJ5G2VndUF-AqKW5bEHtAo7oKeM/', pm_user=True)
 
 def change(message):
     # allows 'owners' to modify the database
