@@ -2,6 +2,8 @@
 
 import irc
 import json
+import urllib
+import csv
 
 # global configuration
 conf = {}
@@ -77,6 +79,20 @@ def owners(message):
     return irc.Response('Successfully updated', pm_user=True)
 
 
+def streams(message):
+    result = []
+    pastebin = "http://pastebin.com/raw.php?i=x5qCS5Gz"
+    data = urllib.urlopen(pastebin)
+    reader = csv.reader(data)
+    round_filter = None
+    if len(message.words) > 1:
+        round_filter = message.words[1]
+    for row in reader:
+        if round_filter != None and row[0] != round_filter:
+            continue
+        result.append('{a[0]:<10} {a[1]:<10} {a[2]:<10}'.format(a=row))
+
+    return irc.Response('\n'.join(result))
 
 def load_config():
     with open('config.json', 'r') as f:
@@ -96,4 +112,5 @@ if __name__ == '__main__':
     bot.add_command('phonebook', phonebook)
     bot.add_command('change', change)
     bot.add_command('owners', owners)
+    bot.add_command('streams', streams)
     bot.run()
