@@ -115,13 +115,13 @@ class Bot(object):
             if self.message.valid_command:
                 print(self.response)
                 if self.message.text.startswith('!commands'):
-                    self.send_message(self.message.user, 'available commands:')
+                    self.send_message(self.message.nick, 'available commands:')
                     if len(self.commands) == 0:
-                        self.send_message(self.message.user, 'none found!')
+                        self.send_message(self.message.nick, 'none found!')
                     else:
                         for k, _ in self.commands.items():
-                            self.send_message(self.message.user, k)
-                elif self.message.text.startswith('!quit') and self.message.user in self.owners:
+                            self.send_message(self.message.nick, k)
+                elif self.message.text.startswith('!quit') and self.message.nick in self.owners:
                     self.disconnect(self.channel, 'pew pew pew')
                     self.running = False
                 else:
@@ -133,6 +133,6 @@ class Bot(object):
                         if result:
                             messages = result.message.split('\n')
                             for item in messages:
-                                self.send_message(self.channel if not result.pm_user else self.message.user, item)
+                                self.send_message(self.channel if not result.pm_user else self.message.nick, item)
                     except Exception as e:
                         print('error found: ' + str(e))
