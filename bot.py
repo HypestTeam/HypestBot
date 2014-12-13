@@ -4,6 +4,7 @@ import irc
 import json
 import urllib
 import csv
+import re, os
 
 # global configuration
 conf = {}
@@ -21,14 +22,14 @@ def phonebook(message):
     return irc.Response('https://docs.google.com/spreadsheets/d/1dsoA_emnkmuroDZV9plDVPY-pQBtaUcnxLcaXQ7g06Y/')
 
 def toc(message):
-    if message.user in conf['owners']:
+    if message.nick in conf.get('owners', []):
         return irc.Response('https://docs.google.com/spreadsheets/d/1uYu-dk8-HjQt98fEoJ5G2VndUF-AqKW5bEHtAo7oKeM/', pm_user=True)
     return None
 
 def change(message):
     # allows 'owners' to modify the database
     # if you're not an owner, so just ignore the message
-    if message.user not in conf['owners']:
+    if message.nick not in conf.get('owners', []):
         return irc.Response('Sorry, you are not an owner thus not authorised to use this command', pm_user=True)
 
     if message.text == '!change help':
@@ -49,7 +50,7 @@ def change(message):
 def owners(message):
     list_of_owners = conf.get('owners', [])
     # allows an owner to modify the owner list
-    if message.user not in list_of_owners:
+    if message.nick not in list_of_owners:
         return irc.Response('Sorry, you are not an owner thus not authorised to use this command', pm_user=True)
 
     if message.text == '!owners help':
@@ -94,6 +95,48 @@ def streams(message):
 
     return irc.Response('\n'.join(result))
 
+def score(message):
+    # [11:49:13 PM] BestTeaMaker: !score <your name> <opponents name> #-#
+    fmt = re.compile(r'!score\s*(?P<you>\w+)\s*(?P<opponent>\w+)\s*(?P<score>\d)\-(?P<opscore>\d)', re.UNICODE)
+    result = fmt.match(message.text)
+    if not result:
+        return irc.Response('Incorrect format given.\n'\
+                            'Must be !score <your name> <opponent name> <your score>-<opponent score>', pm_user=True)
+
+    score = int(result.group('score'))
+    opscore = int(result.group('opscore'))
+    if (score, opscore) not in [(2, 1), (1, 2), (2, 0), (0, 2)]:
+        return irc.Response('Incorrect score total. Possible variations are 2-1, 1-2, 2-0, or 0-2', pm_user=True)
+
+    with open('round.txt', 'a') as f:
+        f.write('{0}:{1} {2}:{3}\n'.format(result.group('you'), score, result.group('opponent'), opscore))
+
+    return irc.Response('Score successfully recorded! Make sure to wait until next round.\n', pm_user=True)
+
+
+def endround(message):
+    if message.nick not in conf.get('owners', []):
+        return irc.Response('You are not authorised to use this command', pm_user=True)
+
+    data = None
+    with open('round.txt') as f:
+        data = f.read()
+
+    api_key = conf.get('pastebin', None)
+    if api_key == None:
+        return irc.Response('Unfortunately something broke. Please tell rapptz that there is\
+                             a missing or invalid pastebin API key.', pm_user=True)
+
+    link = r"http://pastebin.com/api/api_post.php"
+    params = urllib.urlencode({'api_dev_key': api_key, 'api_option': 'paste', 'api_paste_code': data })
+    resp = urllib.urlopen(link, params)
+    contents = resp.read()
+    if 'Bad API' in contents:
+        return irc.Response('Unfortunately something broke. Paste could not be posted. Contact rapptz', pm_user=True)
+
+    os.remove('round.txt')
+    return irc.Response(contents)
+
 def load_config():
     with open('config.json', 'r') as f:
         return json.load(f)
@@ -113,4 +156,6 @@ if __name__ == '__main__':
     bot.add_command('change', change)
     bot.add_command('owners', owners)
     bot.add_command('streams', streams)
+    bot.add_command('endround', endround)
+    bot.add_command('score', score)
     bot.run()
