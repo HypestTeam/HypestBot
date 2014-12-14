@@ -94,12 +94,12 @@ def streams(message):
     return irc.Response('\n'.join(result))
 
 def score(message):
-    # [11:49:13 PM] BestTeaMaker: !score <your name> <opponents name> #-#
-    fmt = re.compile(r'!score\s*(?P<you>\w+)\s*(?P<opponent>\w+)\s*(?P<score>\d)\-(?P<opscore>\d)', re.UNICODE)
+    # !score <me>: <score> <you>: <score>
+    fmt = re.compile(r'!score\s*(?P<you>\w+)\s*\:\s*(?P<score>\d+)\s*(?P<opponent>\w+)\s*\:\s*(?P<opscore>\d+)', re.UNICODE)
     result = fmt.match(message.text)
     if not result:
         return irc.Response('Incorrect format given.\n'\
-                            'Must be !score <your name> <opponent name> <your score>-<opponent score>', pm_user=True)
+                            'Must be !score <your name>: <your score> <opponent name>: <opponent score>', pm_user=True)
 
     score = int(result.group('score'))
     opscore = int(result.group('opscore'))
