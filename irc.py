@@ -85,6 +85,11 @@ class Bot(object):
 
     def disconnect(self, channel, message):
         self.irc.send('PART {} :{}\r\n'.format(channel, message))
+        if channel in self.channels:
+            self.channels.remove(channel)
+
+        if len(self.channels) == 0:
+            self.running = False
 
     def join(self):
         for channel in self.channels:
@@ -138,9 +143,9 @@ class Bot(object):
                     else:
                         for k, _ in self.commands.items():
                             self.send_message(self.message.nick, k)
-                elif self.message.text.startswith('!quit') and self.message.nick in self.owners:
+                elif self.message.text.startswith('!leave') and self.message.nick in self.owners:
                     self.disconnect(self.current_channel, 'pew pew pew')
-                elif self.message.text.startswith('!exit') and self.message.nick in self.owners:
+                elif self.message.text.startswith('!quit') and self.message.nick in self.owners:
                     for channel in self.channels:
                         self.disconnect(channel, 'quitting bot')
                     self.running = False

@@ -6,6 +6,8 @@ import urllib
 import csv
 import re, os
 import codecs
+import requests
+from collections import namedtuple
 
 # global configuration
 conf = {}
@@ -203,6 +205,61 @@ def viewround(message):
 
     return irc.Response(contents)
 
+def seed(message):
+    if message.nick not in conf.get('owners', []):
+        return irc.Response('You are not authorised to use this command', pm_user=True)
+
+    p = conf.get('tps', None)
+    if p == None or not os.path.exists(p):
+        return irc.Response('No TPS database has been found. Sorry.', pm_user=True)
+
+    api_key =conf.get('challonge', None)
+    if api_key == None:
+        return irc.Response('No Challonge API key has been set in config', pm_user=True)
+
+    db = {}
+    with codecs.open(p, 'r', 'utf-8') as f:
+        db = json.load(f)
+
+    m = re.match(r'(?:https?\:\/\/)?(?:(?P<subdomain>\w*)\.)?challonge\.com\/(?P<url>\w*)', message.words[1])
+    url = m.group('url')
+    if m.group('subdomain'):
+        url = '{}-{}'.format(m.group('subdomain'), m.group('url'))
+
+
+    params = {
+        'api_key': api_key
+    }
+    participants = requests.get('https://api.challonge.com/v1/tournaments/{}/participants.json'.format(url), params=params)
+    if participants.status_code != 200:
+        return irc.Response('Unable to access challonge API [error: {}]'.format(participants.text), pm_user=True)
+    pjson = participants.json()
+
+    # get a mapping of (challonge_username, participant_id, tps)
+    User = namedtuple('User', ['name', 'id', 'tps'])
+    users = []
+    for obj in pjson:
+        participant = obj['participant']
+        name = participant["challonge_username"]
+        pid = participant["id"]
+        tps = db.get(name, 1000)
+        users.append(User(name=name, id=pid, tps=tps))
+
+    # sort the users by their TPS score
+    users.sort(key=lambda x: x.tps, reverse=True)
+
+    # update the seed based on position on the list
+    for seed, user in enumerate(users):
+        params = {
+            'api_key': api_key,
+            'participant[seed]': seed + 1
+        }
+        r = requests.put('https://api.challonge.com/v1/tournaments/{}/participants/{}.json'.format(url, user.id), params=params)
+        if r.status_code != 200:
+            return irc.Response('Unable to access challonge API [error: {}]'.format(r.text), pm_user=True)
+
+    return irc.Response('Tournament has successfully been seeded.', pm_user=True)
+
 def load_config():
     with open('config.json', 'r') as f:
         return json.load(f)
@@ -225,4 +282,5 @@ if __name__ == '__main__':
     bot.add_command('endround', endround)
     bot.add_command('viewround', viewround)
     bot.add_command('score', score)
+    bot.add_command('seed', seed)
     bot.run()

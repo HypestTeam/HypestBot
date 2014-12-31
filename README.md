@@ -12,7 +12,7 @@ the following contents:
 ```js
 {
     "bracket": "url where bracket is located",
-    "channel": "#TheIRCCHannel",
+    "channels": [ "#TheIRCCHannel" ],
     "nickname": "TheBotName",
     "owners": [
         "a list of nicknames who own the bot"
@@ -38,7 +38,9 @@ someone who isn't an owner uses an owner only command then the user is PM'd an e
 1. `!change`: Changes the output from `!bracket` and `!rules`. Type `!change help` for more info.
 2. `!owners`: Manages the owners of the bot. Type `!owners help` for more info.
 3. `!endround`: Resets processing of the `!score` commands and pastes the previous results to pastebin.
-4. `!quit`: Exits the bot.
+4. `!leave`: Leaves the current channel.
+5. `!exit`: Quits the bot.
+6. `!seed`: Seeds the challonge bracket provided with the TPS score.
 
 #### General Commands
 
