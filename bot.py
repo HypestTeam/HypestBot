@@ -48,7 +48,7 @@ def tps(message):
         try:
             place = scores.index(score)
             return irc.Response('User {} is {}/{} place with a TPS of {}'.format(username, place, len(scores), score), pm_user=True)
-        except Exception, e:
+        except Exception as e:
             return irc.Response('Placing not found for user {}.'.format(username), pm_user=True)
 
     return irc.Response('User {} has a TPS of {}'.format(username, score), pm_user=True)
@@ -213,7 +213,7 @@ def update_config(conf):
 
 if __name__ == '__main__':
     conf = load_config()
-    bot = irc.Bot(owners=conf.get('owners', []), server=conf['server'], channel=conf['channel'],
+    bot = irc.Bot(owners=conf.get('owners', []), server=conf['server'], channels=conf['channels'],
                   nickname=conf['nickname'], password=conf['password'])
     bot.add_command('bracket', bracket)
     bot.add_command('rules', rules)

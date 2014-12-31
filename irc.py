@@ -10,7 +10,9 @@ class Message(object):
         regex = r'\:(?P<source>(?P<nick>[^!]+)![~]{0,1}(?P<user>[^@]+)@)?(?P<host>[^\s]+)\s(?P<command>[^\s]+)\s?(?P<parameters>[^:]+){0,1}\:?(?P<text>[^\r^\n]+)?'
         match = re.match(regex, msg)
         self.valid_command = False
+        self.is_message = False
         if match:
+            self.is_message = True
             self.raw_message = match.group(0)
             self.source = match.group('source')
             self.nick = match.group('nick')
@@ -21,6 +23,18 @@ class Message(object):
             self.text = match.group('text')
             self.valid_command = self.text != None and self.text[0] == '!'
             self.words = [word.rstrip(string.punctuation) for word in self.text.split()] if self.text != None else []
+
+    def __len__(self):
+        if self.is_message:
+            return len(self.text)
+        else:
+            return 0
+
+    def channel_used(self):
+        if self.is_message and self.command == 'PRIVMSG':
+            return self.parameters.strip()
+        else:
+            return ''
 
 """
 Represents a response from a command function
@@ -33,7 +47,7 @@ class Response(object):
 class Bot(object):
     def __init__(self, **kwargs):
         self.server = kwargs['server']
-        self.channel = kwargs['channel']
+        self.channels = kwargs['channels']
         self.nickname = kwargs['nickname']
         self.password = kwargs['password']
         self.owners = kwargs.get('owners', [])
@@ -41,6 +55,7 @@ class Bot(object):
         self.response = ''
         self.commands = {}
         self.running = True
+        self.current_channel = ''
 
         # actually connect
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -71,9 +86,10 @@ class Bot(object):
     def disconnect(self, channel, message):
         self.irc.send('PART {} :{}\r\n'.format(channel, message))
 
-    def join(self, channel):
-        print('joining ' + channel)
-        self.irc.send('JOIN {}\r\n'.format(channel))
+    def join(self):
+        for channel in self.channels:
+            print('joining ' + channel)
+            self.irc.send('JOIN {}\r\n'.format(channel))
 
     def add_owner(self, owner):
         self.owners.append(owner)
@@ -98,7 +114,7 @@ class Bot(object):
         server_match = re.search(r'\:Your host is (.*),', self.response)
         self.chat_server = server_match.group(1) if server_match else self.server
         print('The chat server found is ' + self.chat_server)
-        self.join(self.channel)
+        self.join()
         while self.running:
             self.response = self.irc.recv(2048).strip()
             self.pong()
@@ -111,6 +127,7 @@ class Bot(object):
                 continue
 
             self.message = Message(self.response)
+            self.current_channel = self.message.channel_used()
 
             if self.message.valid_command:
                 print(self.response)
@@ -122,7 +139,10 @@ class Bot(object):
                         for k, _ in self.commands.items():
                             self.send_message(self.message.nick, k)
                 elif self.message.text.startswith('!quit') and self.message.nick in self.owners:
-                    self.disconnect(self.channel, 'pew pew pew')
+                    self.disconnect(self.current_channel, 'pew pew pew')
+                elif self.message.text.startswith('!exit') and self.message.nick in self.owners:
+                    for channel in self.channels:
+                        self.disconnect(channel, 'quitting bot')
                     self.running = False
                 else:
                     function = self.commands.get(self.message.words[0].lower(), None)
@@ -133,6 +153,6 @@ class Bot(object):
                         if result:
                             messages = result.message.split('\n')
                             for item in messages:
-                                self.send_message(self.channel if not result.pm_user else self.message.nick, item)
+                                self.send_message(self.current_channel if not result.pm_user else self.message.nick, item)
                     except Exception as e:
                         print('error found: ' + str(e))
