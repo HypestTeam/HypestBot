@@ -5,6 +5,7 @@ import json
 import urllib
 import csv
 import re, os
+import codecs
 
 # global configuration
 conf = {}
@@ -21,8 +22,37 @@ def phonebook(message):
     # posts the phonebook
     return irc.Response('https://docs.google.com/spreadsheets/d/1dsoA_emnkmuroDZV9plDVPY-pQBtaUcnxLcaXQ7g06Y/')
 
-def toc(message):
-    return irc.Response('https://docs.google.com/spreadsheets/d/1uYu-dk8-HjQt98fEoJ5G2VndUF-AqKW5bEHtAo7oKeM/')
+def tps(message):
+    p = conf.get('tps', None)
+    if p == None or not os.path.exists(p):
+        return irc.Response('No TPS database has been found. Sorry.', pm_user=True)
+
+    if message.text == '!tps help':
+        return irc.Response('!tps <challonge username> -- returns your TPS (Tournament Participation Score)\n'\
+                            '!tps <challonge username> place -- returns your placing in the TPS leaderboards', pm_user=True)
+
+    words = message.text.split(' ')
+    if len(words) == 1:
+        return irc.Response('Invalid format given. Check !tps help', pm_user=True)
+
+    username = words[1]
+    check_place = len(words) == 3 and words[2] == 'place'
+
+    db = {}
+    with codecs.open(p, 'r', 'utf-8') as f:
+        db = json.load(f)
+
+    score = db.get(username, 1000)
+    if check_place:
+        scores = sorted(db.values(), reverse=True)
+        try:
+            place = scores.index(score)
+            return irc.Response('User {} is {}/{} place with a TPS of {}'.format(username, place, len(scores), score), pm_user=True)
+        except Exception, e:
+            return irc.Response('Placing not found for user {}.'.format(username), pm_user=True)
+
+    return irc.Response('User {} has a TPS of {}'.format(username, score), pm_user=True)
+
 
 def change(message):
     # allows 'owners' to modify the database
@@ -186,9 +216,9 @@ if __name__ == '__main__':
     bot = irc.Bot(owners=conf.get('owners', []), server=conf['server'], channel=conf['channel'],
                   nickname=conf['nickname'], password=conf['password'])
     bot.add_command('bracket', bracket)
-    bot.add_command('toc', toc)
     bot.add_command('rules', rules)
     bot.add_command('phonebook', phonebook)
+    bot.add_command('tps', tps)
     bot.add_command('change', change)
     bot.add_command('owners', owners)
     bot.add_command('streams', streams)

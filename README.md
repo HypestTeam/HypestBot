@@ -20,7 +20,8 @@ the following contents:
     "password": "the bot password for NickServ",
     "rules": "url where the rules are located",
     "server": "the server the bot should go to (e.g. irc.snoonet.org)",
-    "pastebin": "The pastebin developer key"
+    "pastebin": "The pastebin developer key",
+    "tps": "TPS database file location (must be .json)"
 }
 
 ```
@@ -43,10 +44,10 @@ someone who isn't an owner uses an owner only command then the user is PM'd an e
 
 1. `!bracket`: Posts a URL to the brackets.
 2. `!phonebook`: Posts a URL to the Hypest Phonebook.
-3. `!toc`: Posts a URL to the TOC ruling.
-4. `!rules`: Posts a URL to the current ruleset.
-5. `!streams`: Posts the current streams as managed by the pastebin provided by BestTeaMaker. This will be made more generalised soon.
-6. `!score`: Registers a score for the round.
+3. `!rules`: Posts a URL to the current ruleset.
+4. `!streams`: Posts the current streams as managed by the pastebin provided by BestTeaMaker. This will be made more generalised soon.
+5. `!score`: Registers a score for the round.
+6. `!tps`: Displays the user's Tournament Participation Score.
 
 
 ### Custom Commands
