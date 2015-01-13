@@ -159,11 +159,12 @@ def seed(message):
     User = namedtuple('User', ['name', 'id', 'tps'])
     users = []
     for obj in pjson:
-        participant = obj['participant']
-        name = participant["challonge_username"]
-        pid = participant["id"]
-        tps = db.get(name, 1000)
-        users.append(User(name=name, id=pid, tps=tps))
+        if obj.get('checked_in', True):
+            participant = obj['participant']
+            name = participant["challonge_username"]
+            pid = participant["id"]
+            tps = db.get(name, 1000)
+            users.append(User(name=name, id=pid, tps=tps))
 
     # sort the users by their TPS score
     users.sort(key=lambda x: x.tps, reverse=True)
