@@ -125,86 +125,6 @@ def streams(message):
 
     return irc.Response('\n'.join(result))
 
-def score(message):
-    # !score <me>: <score> <you>: <score>
-    fmt = re.compile(r'!score\s*(?P<you>[a-zA-Z_\-\[\]\\^{}|`][\w\-\[\]\\^{}|`]*)\s*\:\s*(?P<score>\d+)\s*'\
-                     r'(?P<opponent>[a-zA-Z_\-\[\]\\^{}|`][\w\-\[\]\\^{}|`]*)\s*\:\s*(?P<opscore>\d+)', re.UNICODE)
-    result = fmt.match(message.text)
-    if not result:
-        return irc.Response('Incorrect format given.\n'\
-                            'Must be !score <your name>: <your score> <opponent name>: <opponent score>', pm_user=True)
-
-    score = int(result.group('score'))
-    opscore = int(result.group('opscore'))
-    if (score, opscore) not in [(2, 1), (1, 2), (2, 0), (0, 2)]:
-        return irc.Response('Incorrect score total. Possible variations are 2-1, 1-2, 2-0, or 0-2', pm_user=True)
-
-    with open('round.txt', 'a') as f:
-        f.write('{0}:{1} {2}:{3} was reported by {4}\n'.format(result.group('you'), score,
-                                                               result.group('opponent'), opscore, message.nick))
-
-    return irc.Response('Score successfully recorded! Make sure to wait until next round.\n', pm_user=True)
-
-
-def endround(message):
-    if message.nick not in conf.get('owners', []):
-        return irc.Response('You are not authorised to use this command', pm_user=True)
-
-    data = None
-    with open('round.txt') as f:
-        data = f.read()
-
-    api_key = conf.get('pastebin', None)
-    if api_key == None:
-        return irc.Response('Unfortunately something broke. Please tell rapptz that there is\
-                             a missing or invalid pastebin API key.', pm_user=True)
-
-    link = r"http://pastebin.com/api/api_post.php"
-    params_dict = {
-        'api_dev_key': api_key,
-        'api_option': 'paste',
-        'api_paste_code': data,
-        'api_paste_name': 'End of Round Results',
-        'api_paste_expire_date': '1H'
-    }
-    params = urllib.urlencode(params_dict)
-    resp = urllib.urlopen(link, params)
-    contents = resp.read()
-    if 'Bad API' in contents:
-        return irc.Response('Unfortunately something broke. Paste could not be posted. Contact rapptz', pm_user=True)
-
-    os.remove('round.txt')
-    return irc.Response(contents)
-
-def viewround(message):
-    if message.nick not in conf.get('owners', []):
-        return irc.Response('You are not authorised to use this command', pm_user=True)
-
-    data = None
-    with open('round.txt') as f:
-        data = f.read()
-
-    api_key = conf.get('pastebin', None)
-    if api_key == None:
-        return irc.Response('Unfortunately something broke. Please tell rapptz that there is\
-                             a missing or invalid pastebin API key.', pm_user=True)
-
-    link = r"http://pastebin.com/api/api_post.php"
-    params_dict = {
-        'api_dev_key': api_key,
-        'api_option': 'paste',
-        'api_paste_code': data,
-        'api_paste_name': 'A View of Round Results',
-        'api_paste_expire_date': '10M'
-    }
-    params = urllib.urlencode(params_dict)
-    resp = urllib.urlopen(link, params)
-    contents = resp.read()
-    if 'Bad API' in contents:
-        return irc.Response('Unfortunately something broke. Paste could not be posted. Contact rapptz', pm_user=True)
-
-    return irc.Response(contents)
-
 def seed(message):
     if message.nick not in conf.get('owners', []):
         return irc.Response('You are not authorised to use this command', pm_user=True)
@@ -279,8 +199,5 @@ if __name__ == '__main__':
     bot.add_command('change', change)
     bot.add_command('owners', owners)
     bot.add_command('streams', streams)
-    bot.add_command('endround', endround)
-    bot.add_command('viewround', viewround)
-    bot.add_command('score', score)
     bot.add_command('seed', seed)
     bot.run()
