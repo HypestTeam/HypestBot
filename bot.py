@@ -37,7 +37,7 @@ def tps(message):
     if len(words) == 1:
         return irc.Response('Invalid format given. Check !tps help', pm_user=True)
 
-    username = words[1]
+    username = words[1].lower()
     check_place = len(words) == 3 and words[2] == 'place'
 
     db = {}
