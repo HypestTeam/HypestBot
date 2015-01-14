@@ -181,6 +181,25 @@ def seed(message):
 
     return irc.Response('Tournament has successfully been seeded.', pm_user=True)
 
+
+def form(message):
+    return irc.Response("http://goo.gl/CfFKeO")
+
+def faq(message):
+    return irc.Response("http://goo.gl/EUbs9X")
+
+def conduct(message):
+    return irc.Response("http://goo.gl/FvbxHm")
+
+def tutorial(message):
+    return irc.Response("http://goo.gl/wRFPoU")
+
+def ranking(message):
+    return irc.Response("http://www.reddit.com/r/smashbros/wiki/rankings")
+
+def calendar(message):
+    return irc.Response("http://www.reddit.com/r/smashbros/wiki/eventcalendar")
+
 def load_config():
     with open('config.json', 'r') as f:
         return json.load(f)
@@ -201,4 +220,10 @@ if __name__ == '__main__':
     bot.add_command('owners', owners)
     bot.add_command('streams', streams)
     bot.add_command('seed', seed)
+    bot.add_command('form', form)
+    bot.add_command('faq', faq)
+    bot.add_command('conduct', conduct)
+    bot.add_command('tutorial', tutorial)
+    bot.add_command('ranking', ranking)
+    bot.add_command('calendar', calendar)
     bot.run()

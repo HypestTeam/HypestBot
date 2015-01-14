@@ -34,19 +34,25 @@ someone who isn't an owner uses an owner only command then the user is PM'd an e
 
 #### Owner Only Commands
 
-1. `!change`: Changes the output from `!bracket` and `!rules`. Type `!change help` for more info.
-2. `!owners`: Manages the owners of the bot. Type `!owners help` for more info.
-3. `!leave`: Leaves the current channel.
-4. `!exit`: Quits the bot.
-5. `!seed`: Seeds the challonge bracket provided with the TPS score.
+- `!change`: Changes the output from `!bracket` and `!rules`. Type `!change help` for more info.
+- `!owners`: Manages the owners of the bot. Type `!owners help` for more info.
+- `!leave`: Leaves the current channel.
+- `!exit`: Quits the bot.
+- `!seed`: Seeds the challonge bracket provided with the TPS score.
 
 #### General Commands
 
-1. `!bracket`: Posts a URL to the brackets.
-2. `!phonebook`: Posts a URL to the Hypest Phonebook.
-3. `!rules`: Posts a URL to the current ruleset.
-4. `!streams`: Posts the current streams as managed by the pastebin provided by BestTeaMaker. This will be made more generalised soon.
-5. `!tps`: Displays the user's Tournament Participation Score.
+- `!bracket`: Posts a URL to the brackets.
+- `!phonebook`: Posts a URL to the Hypest Phonebook.
+- `!rules`: Posts a URL to the current ruleset.
+- `!streams`: Posts the current streams as managed by the pastebin provided by BestTeaMaker. This will be made more generalised soon.
+- `!tps`: Displays the user's Tournament Participation Score.
+- `!form`: Posts a URL to the sign-up form.
+- `!faq`: Posts a URL to the FAQ.
+- `!conduct`: Posts a URL to the Code of Conduct.
+- `!tutorial`: Posts a URL to the tutorials provided.
+- `!ranking`: Posts a URL to the /r/smashbros ranking.
+- `!calendar`: Posts a URL to the /r/smashbros Event Calendar.
 
 
 ### Custom Commands
