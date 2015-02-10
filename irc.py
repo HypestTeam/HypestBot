@@ -52,10 +52,14 @@ class Bot(object):
         self.password = kwargs['password']
         self.owners = kwargs.get('owners', [])
         self.port = kwargs.get('port', 6667)
+        self.login_command = kwargs.get('login', None)
         self.response = ''
         self.commands = {}
         self.running = True
         self.current_channel = ''
+
+        if self.login_command and not self.login_command.endswith('\r\n'):
+            self.login_command = self.login_command + '\r\n'
 
         # actually connect
         self.irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -112,7 +116,10 @@ class Bot(object):
 
     def sign_in(self):
         print('signing in...')
-        self._send('PRIVMSG NickServ :identify {}\r\n'.format(self.password))
+        if self.login_command:
+            self._send(self.login_command.format(pw=self.password, user=self.nickname))
+        else:
+            self._send('PRIVMSG NickServ :identify {}\r\n'.format(self.password))
         print(self.response)
 
     def run(self):
@@ -124,9 +131,10 @@ class Bot(object):
             self.response = self.irc.recv(2048).strip()
             self.pong()
 
-            # we're being bugged to log on so go ahead and do so >_>
-            if ':You have 30 seconds to identify to your nickname' in self.response:
+            # force sign-in, again >_>
+            if '{} is a registered nick'.format(self.nickname) in self.response:
                 self.sign_in()
+                self.join()
 
             if self.chat_server in self.response:
                 continue
@@ -136,13 +144,12 @@ class Bot(object):
 
             if self.message.valid_command:
                 print(self.response)
-                if self.message.text.startswith('!commands'):
+                if self.message.text.startswith('!botcommands'):
                     self.send_message(self.message.nick, 'available commands:')
                     if len(self.commands) == 0:
                         self.send_message(self.message.nick, 'none found!')
                     else:
-                        for k, _ in self.commands.items():
-                            self.send_message(self.message.nick, k)
+                        self.send_message(self.message.nick, ', '.join(self.commands.keys()))
                 elif self.message.text.startswith('!leave') and self.message.nick in self.owners:
                     self.disconnect(self.current_channel, 'pew pew pew')
                 elif self.message.text.startswith('!quit') and self.message.nick in self.owners:

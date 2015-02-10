@@ -4,7 +4,7 @@ import irc
 import json
 import urllib
 import csv
-import re, os
+import re, os, sys
 import codecs
 import requests
 from collections import namedtuple
@@ -210,8 +210,9 @@ def update_config(conf):
 
 if __name__ == '__main__':
     conf = load_config()
-    bot = irc.Bot(owners=conf.get('owners', []), server=conf['server'], channels=conf['channels'],
-                  nickname=conf['nickname'], password=conf['password'])
+    reload(sys)
+    sys.setdefaultencoding('utf-8')
+    bot = irc.Bot(**conf)
     bot.add_command('bracket', bracket)
     bot.add_command('rules', rules)
     bot.add_command('phonebook', phonebook)
