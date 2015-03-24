@@ -77,6 +77,73 @@ def owners(message):
     update_config(conf)
     return irc.Response('Successfully updated', pm_user=True)
 
+def rank(message):
+    directory = conf.get('ranking_directory', None)
+    if directory == None or not os.path.exists(directory):
+        return irc.Response('Internal error occurred: no directory for databases', pm_user=True)
+
+    if message.text == '!rank help':
+        resp = [ '!rank 3ds <challonge username> -- Returns your ranking for Smash 3DS',
+                 '!rank wiiu <challonge username> -- Returns your ranking for Smash Wii U',
+                 '!rank melee <challonge username> -- Returns your ranking for Melee',
+                 '!rank brawl <challonge username> -- Returns your ranking for Brawl',
+                 '!rank ssf2 <challonge username> -- Returns your ranking for Super Smash Flash 2',
+                 '!rank 64 <challonge username> -- Returns your ranking for Smash 64',
+                 '!rank projectm <challonge username> -- Returns your ranking for Project M'
+               ]
+        return irc.Response('\n'.join(resp), pm_user=True)
+
+    words = message.text.split(' ')
+    if len(words) != 3:
+        return irc.Response('Invalid format given. Check !rank help for more info', pm_user=True)
+
+    mapping = {
+        '3ds': 'ssb3ds.json',
+        'wiiu': 'ssbwiiu.json',
+        'melee': 'ssbm.json',
+        'brawl': 'ssbb.json',
+        'projectm': 'projectm.json',
+        'ssf2': 'ssf2.json',
+        '64': 'ssb64.json'
+    }
+
+    filename = mapping.get(words[1].lower(), None)
+    if filename == None:
+        return irc.Response('Invalid game given. Check !rank help for more info', pm_user=True)
+
+    full_filename = os.path.join(directory, filename)
+
+    if not os.path.exists(full_filename):
+        return irc.Response('Internal error occurred: no database file found', pm_user=True)
+
+    db = {}
+    with open(full_filename, 'r') as f:
+        db = json.loads(f.read().decode('utf-8-sig'))
+
+    db = dict((k.lower(), v) for k, v in db.iteritems())
+
+    entry = db.get(words[2].lower(), None)
+    if entry == None:
+        return irc.Response('No entry found for ' + words[2], pm_user=True)
+
+    valid_keys = ['losses', 'wins', 'rating', 'ties', 'challonge_username']
+    for key in valid_keys:
+        if key not in entry:
+            return irc.Response('Internal error: incomplete entry found for ' + words[2], pm_user=True)
+
+    # create the rankings list
+    ranking = sorted(db.values(), key=lambda e: e['rating'], reverse=True)
+    ranking = [x['challonge_username'] for x in ranking]
+    # check the player placing
+    stats = 'Rating: {0} (Wins: {1}, Losses: {2}, Ties: {3}) [W/L Ratio: {4:.2}]'
+    stats = stats.format(entry['rating'], entry['wins'], entry['losses'], entry['ties'], float(entry['wins'])/entry['losses'])
+
+    try:
+        place = ranking.index(entry['challonge_username'])
+        placing = 'User {2} is ranked {0} out of {1} players.\n'.format(place + 1, len(ranking), entry['challonge_username'])
+        return irc.Response(placing + stats, pm_user=True)
+    except Exception as e:
+        return irc.Response(stats, pm_user=True)
 
 def streams(message):
     result = []
@@ -187,6 +254,7 @@ if __name__ == '__main__':
     bot.add_command('change', change)
     bot.add_command('owners', owners)
     bot.add_command('streams', streams)
+    bot.add_command('rank', rank)
     bot.add_command('seed', seed)
     bot.add_command('form', form)
     bot.add_command('faq', faq)

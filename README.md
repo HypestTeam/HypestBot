@@ -19,7 +19,8 @@ the following contents:
     ],
     "password": "the bot password for NickServ",
     "rules": "url where the rules are located",
-    "server": "the server the bot should go to (e.g. irc.snoonet.org)"
+    "server": "the server the bot should go to (e.g. irc.snoonet.org)",
+    "ranking_directory": "directory with the corresponding Hypest Database files"
 }
 
 ```
@@ -45,6 +46,7 @@ someone who isn't an owner uses an owner only command then the user is PM'd an e
 - `!phonebook`: Posts a URL to the Hypest Phonebook.
 - `!rules`: Posts a URL to the current ruleset.
 - `!streams`: Posts the current streams as managed by the pastebin provided by BestTeaMaker. This will be made more generalised soon.
+- `!rank`: Posts a player's rankings and stats for a specific game.
 - `!form`: Posts a URL to the sign-up form.
 - `!faq`: Posts a URL to the FAQ.
 - `!conduct`: Posts a URL to the Code of Conduct.

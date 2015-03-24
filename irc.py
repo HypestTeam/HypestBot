@@ -1,5 +1,6 @@
 import socket, time
 import re, string
+import traceback
 
 """
 Represents an IRC message
@@ -167,4 +168,5 @@ class Bot(object):
                             for item in messages:
                                 self.send_message(self.current_channel if not result.pm_user else self.message.nick, item)
                     except Exception as e:
-                        print('error found: ' + str(e))
+                        print('error found:')
+                        print(traceback.format_exc())
