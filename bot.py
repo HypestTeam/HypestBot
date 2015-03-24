@@ -12,6 +12,25 @@ from collections import namedtuple
 # global configuration
 conf = {}
 
+# a global mapping of game ids to filename
+game_to_filename = {
+    '3ds': 'ssb3ds.json',
+    'wiiu': 'ssbwiiu.json',
+    'melee': 'ssbm.json',
+    'brawl': 'ssbb.json',
+    'projectm': 'projectm.json',
+    'ssf2': 'ssf2.json',
+    '64': 'ssb64.json',
+    16869: 'ssb3ds.json',
+    20988: 'ssbwiiu.json',
+    394: 'ssbm.json',
+    393: 'ssbb.json',
+    392: 'ssb64.json',
+    597: 'projectm.json',
+    1106: 'ssf2.json'
+}
+
+
 def bracket(message):
     # just posts the url
     return irc.Response(conf.get('bracket', 'Unknown please see !change help'))
@@ -97,17 +116,7 @@ def rank(message):
     if len(words) != 3:
         return irc.Response('Invalid format given. Check !rank help for more info', pm_user=True)
 
-    mapping = {
-        '3ds': 'ssb3ds.json',
-        'wiiu': 'ssbwiiu.json',
-        'melee': 'ssbm.json',
-        'brawl': 'ssbb.json',
-        'projectm': 'projectm.json',
-        'ssf2': 'ssf2.json',
-        '64': 'ssb64.json'
-    }
-
-    filename = mapping.get(words[1].lower(), None)
+    filename = game_to_filename.get(words[1].lower(), None)
     if filename == None:
         return irc.Response('Invalid game given. Check !rank help for more info', pm_user=True)
 
@@ -164,17 +173,13 @@ def seed(message):
     if message.nick not in conf.get('owners', []):
         return irc.Response('You are not authorised to use this command', pm_user=True)
 
-    p = conf.get('tps', None)
-    if p == None or not os.path.exists(p):
-        return irc.Response('No TPS database has been found. Sorry.', pm_user=True)
+    directory = conf.get('ranking_directory', None)
+    if directory == None or not os.path.exists(directory):
+        return irc.Response('No ranking database has been found. Sorry.', pm_user=True)
 
     api_key =conf.get('challonge', None)
     if api_key == None:
         return irc.Response('No Challonge API key has been set in config', pm_user=True)
-
-    db = {}
-    with codecs.open(p, 'r', 'utf-8') as f:
-        db = json.load(f)
 
     m = re.match(r'(?:https?\:\/\/)?(?:(?P<subdomain>\w*)\.)?challonge\.com\/(?P<url>\w*)', message.words[1])
     url = m.group('url')
@@ -183,29 +188,53 @@ def seed(message):
 
 
     params = {
-        'api_key': api_key
+        'api_key': api_key,
+        'include_participants': '1'
     }
-    participants = requests.get('https://api.challonge.com/v1/tournaments/{}/participants.json'.format(url), params=params)
+
+    participants = requests.get('https://api.challonge.com/v1/tournaments/{}.json'.format(url), params=params)
     if participants.status_code != 200:
         return irc.Response('Unable to access challonge API [error: {}]'.format(participants.text), pm_user=True)
-    pjson = participants.json()
+    js = participants.json()
 
-    # get a mapping of (challonge_username, participant_id, tps)
-    User = namedtuple('User', ['name', 'id', 'tps'])
+    tournament = js['tournament']
+
+    if tournament['state'] == 'complete':
+        return irc.Response('Tournament is already complete', pm_user=True)
+    elif tournament['state'] != 'checked_in':
+        return irc.Response('Check ins have not been processed yet', pm_user=True)
+
+    full_filename = os.path.join(directory, game_to_filename.get(tournament['game_id'], None))
+    if full_filename == None or not os.path.exists(full_filename):
+        return irc.Response('Hypest Database file not found', pm_user=True)
+
+    db = {}
+    with open(full_filename) as f:
+        db = json.loads(f.read().decode('utf-8-sig'))
+
+    # get a mapping of (challonge_username, participant_id, rating)
+    User = namedtuple('User', ['name', 'id', 'rating'])
     users = []
-    for obj in pjson:
-        if obj.get('checked_in', True):
-            participant = obj['participant']
+    for obj in tournament['participants']:
+        participant = obj['participant']
+        if participant.get('checked_in', False):
             name = participant["challonge_username"]
             pid = participant["id"]
-            tps = db.get(name, 1000)
-            users.append(User(name=name, id=pid, tps=tps))
+            rating = db.get(name, None)
+            if rating == None:
+                users.append(User(name=name, id=pid, rating=0))
+            else:
+                users.append(User(name=name, id=pid, rating=rating['rating']))
 
-    # sort the users by their TPS score
-    users.sort(key=lambda x: x.tps, reverse=True)
+
+    # sort the users by their rating score
+    users.sort(key=lambda x: x.rating, reverse=True)
 
     # update the seed based on position on the list
+    # the seeds.txt file is used as a way to debug if something goes wrong in the future
+    f = open('seeds.txt', 'w')
     for seed, user in enumerate(users):
+        f.write('{} has a seed of {}\n'.format(str(user), seed + 1))
         params = {
             'api_key': api_key,
             'participant[seed]': seed + 1
