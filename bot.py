@@ -6,6 +6,8 @@ import urllib
 import csv
 import re, os, sys
 import codecs
+import datetime as dt
+import shlex
 import requests
 from collections import namedtuple
 
@@ -169,9 +171,13 @@ def streams(message):
 
     return irc.Response('\n'.join(result))
 
-def seed(message):
+# prepares the bracket by seeding and removing banned players
+def prepare(message):
     if message.nick not in conf.get('owners', []):
         return irc.Response('You are not authorised to use this command', pm_user=True)
+
+    if len(message.words) != 2:
+        return irc.Response('Incorrect format. Must be !prepare <url>', pm_user=True)
 
     directory = conf.get('ranking_directory', None)
     if directory == None or not os.path.exists(directory):
@@ -230,21 +236,101 @@ def seed(message):
     # sort the users by their rating score
     users.sort(key=lambda x: x.rating, reverse=True)
 
+    # just stores the banned usernames for quick lookup
+    banned_usernames = []
+
+    if os.path.exists('bans.txt'):
+        # obtain the list of banned users
+        Ban = namedtuple('Ban', ['challonge', 'end'])
+        bans = []
+        old_ban_lines = 0
+        with open('bans.txt') as ban_file:
+            today = dt.date.today()
+            for line in ban_file:
+                old_ban_lines += 1
+                parts = shlex.split(line)
+                ban = Ban(challonge=parts[0], end=dt.datetime.strptime(parts[1], '%B %d, %Y').date())
+                if ban.end > today:
+                    bans.append(ban)
+
+
+        # update the bans.txt file with the list of currently banned users
+        # effectively removing the now unbanned users
+        if old_ban_lines != len(bans):
+            with open('bans.txt', 'w') as f:
+                for ban in bans:
+                    f.write('{} "{}"\n'.format(ban.challonge, ban.end.strftime('%B %d, %Y')))
+                    banned_usernames.append(ban.challonge)
+
     # update the seed based on position on the list
     # the seeds.txt file is used as a way to debug if something goes wrong in the future
     f = open('seeds.txt', 'w')
-    for seed, user in enumerate(users):
-        f.write('{} has a seed of {}\n'.format(str(user), seed + 1))
+    seed = 1
+    for user in users:
         params = {
-            'api_key': api_key,
-            'participant[seed]': seed + 1
+            'api_key': api_key
         }
+
+        # check if a user is banned, and if so remove them from the seeding calculation
+        if user.name in banned_usernames:
+            r = requests.delete('https://api.challonge.com/v1/tournaments/{}/participants/{}.json'.format(url, user.id), params=params)
+            if r.status_code != 200:
+                return irc.Response('Unable to access challonge API [error: {}]'.format(r.text), pm_user=True)
+            continue
+
+        f.write('{} has a seed of {}\n'.format(str(user), seed))
+        params['participant[seed]'] = seed
         r = requests.put('https://api.challonge.com/v1/tournaments/{}/participants/{}.json'.format(url, user.id), params=params)
         if r.status_code != 200:
             return irc.Response('Unable to access challonge API [error: {}]'.format(r.text), pm_user=True)
+        seed += 1
 
-    return irc.Response('Tournament has successfully been seeded.', pm_user=True)
+    return irc.Response('Tournament has successfully been prepared.', pm_user=True)
 
+def banish(message):
+    if message.nick not in conf.get('owners', []):
+        return irc.Response('You are not authorised to use this command', pm_user=True)
+
+    if message.text == '!banish help':
+        return irc.Response('!banish <username> <days> -- bans a challonge username for days length', pm_user=True)
+
+    if message.text.strip() == '!banish':
+        with open('bans.txt') as f:
+            result = []
+            for line in f:
+                parts = shlex.split(line)
+                result.append('User {0[0]} is banned until {0[1]}'.format(parts))
+            return irc.Response('\n'.join(result), pm_user=True)
+
+    words = message.text.split(' ')
+    if len(words) != 3:
+        return irc.Response('Incorrect format. Check !banish help for more info', pm_user=True)
+
+    with open('bans.txt', 'a') as f:
+        end_date = dt.date.today() + dt.timedelta(days=int(words[2]))
+        f.write('{} "{}"\n'.format(words[1], end_date.strftime('%B %d, %Y')))
+
+    return irc.Response('User {} successfully banished for {} days'.format(words[1], words[2]), pm_user=True)
+
+def unbanish(message):
+    if message.nick not in conf.get('owners', []):
+        return irc.Response('You are not authorised to use this command', pm_user=True)
+
+    if message.text == '!unbanish help':
+        return irc.Response('!unbanish <username> -- prematurely unbans a challonge username', pm_user=True)
+
+    words = message.text.split(' ')
+    if len(words) != 2:
+        return irc.Response('Incorrect format. Check !unbanish help for more info', pm_user=True)
+
+    bans = ''
+    with open('bans.txt') as f:
+        bans = filter(lambda x: words[1] not in x, f.readlines())
+
+    with open('bans.txt', 'w') as f:
+        f.write(''.join(bans))
+
+    return irc.Response('User {} successfully unbanished'.format(words[1]), pm_user=True)
 
 def form(message):
     return irc.Response("http://goo.gl/CfFKeO")
@@ -284,8 +370,10 @@ if __name__ == '__main__':
     bot.add_command('owners', owners)
     bot.add_command('streams', streams)
     bot.add_command('rank', rank)
-    bot.add_command('seed', seed)
+    bot.add_command('prepare', prepare)
     bot.add_command('form', form)
+    bot.add_command('banish', banish)
+    bot.add_command('unbanish', unbanish)
     bot.add_command('faq', faq)
     bot.add_command('conduct', conduct)
     bot.add_command('tutorial', tutorial)
