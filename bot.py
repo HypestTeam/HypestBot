@@ -34,12 +34,26 @@ game_to_filename = {
 
 
 def bracket(message):
-    # just posts the url
-    return irc.Response(conf.get('bracket', 'Unknown please see !change help'))
+    channel = message.channel_used()
+    brackets = conf.get('bracket', None)
+    if not channel.startswith('#'):
+        return irc.Response('This command must be used outside of private messages', pm_user=True)
+
+    if brackets == None:
+        return irc.Response('Unknown bracket found, please see !change help')
+
+    return irc.Response(brackets.get(channel, 'Unknown bracket found, please see !change help'))
 
 def rules(message):
-    # posts the rules
-    return irc.Response(conf.get('rules', 'Unknown please see !change help'))
+    channel = message.channel_used()
+    rules = conf.get('rules', None)
+    if not channel.startswith('#'):
+        return irc.Response('This command must be used outside of private messages', pm_user=True)
+
+    if rules == None:
+        return irc.Response('Unknown rules found, please see !change help')
+
+    return irc.Response(rules.get(channel, 'Unknown rules found, please see !change help'))
 
 def phonebook(message):
     # posts the phonebook
@@ -59,10 +73,21 @@ def change(message):
         return irc.Response('Invalid amount of parameters (expected 3, received {}) check !change help'.format(words), pm_user=True)
 
     command = message.words[1].lower()
+    channel = message.channel_used()
     if command not in ['bracket', 'rules']:
         return irc.Response('Invalid command given (!change {}) check !change help'.format(command), pm_user=True)
 
-    conf[command] = message.words[2]
+    if not channel.startswith('#'):
+        return irc.Response('This command must be used outside of private messages', pm_user=True)
+
+    info = conf.get(command, None)
+    if info == None:
+        info = { channel: message.words[2] }
+    elif isinstance(info, dict):
+        info[channel] = message.words[2]
+    else:
+        return irc.Response('Unable to update {} due to invalid configuration type'.format(command))
+    conf[command] = info
     update_config(conf)
     return irc.Response('Successfully updated', pm_user=True)
 
