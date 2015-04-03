@@ -8,7 +8,7 @@ Represents an IRC message
 class Message(object):
     def __init__(self, msg):
         # :rapptz!rapptz@user/rapptz/x-00071589 PRIVMSG #SmashBrosTourney :okay sign in seems to be working
-        regex = r'\:(?P<source>(?P<nick>[^!]+)![~]{0,1}(?P<user>[^@]+)@)?(?P<host>[^\s]+)\s(?P<command>[^\s]+)\s?(?P<parameters>[^:]+){0,1}\:?(?P<text>[^\r^\n]+)?'
+        regex = r':(?P<source>(?P<nick>[^!]+)!~?(?P<user>[^@]+)@)?(?P<host>[^\s]+)\s(?P<command>[^\s]+)\s?(?P<parameters>[^:]+)?:?(?P<text>[^\r^\n]+)?'
         match = re.match(regex, msg)
         self.valid_command = False
         self.is_message = False
