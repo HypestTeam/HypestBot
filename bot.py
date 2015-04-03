@@ -266,7 +266,7 @@ def prepare(message):
 
     if os.path.exists('bans.txt'):
         # obtain the list of banned users
-        Ban = namedtuple('Ban', ['challonge', 'end'])
+        Ban = namedtuple('Ban', ['challonge', 'end', 'reason'])
         bans = []
         old_ban_lines = 0
         with open('bans.txt') as ban_file:
@@ -274,7 +274,7 @@ def prepare(message):
             for line in ban_file:
                 old_ban_lines += 1
                 parts = shlex.split(line)
-                ban = Ban(challonge=parts[0], end=dt.datetime.strptime(parts[1], '%B %d, %Y').date())
+                ban = Ban(challonge=parts[0], end=dt.datetime.strptime(parts[1], '%B %d, %Y').date(), reason=parts[2])
                 if ban.end > today:
                     bans.append(ban)
 
@@ -284,7 +284,7 @@ def prepare(message):
         if old_ban_lines != len(bans):
             with open('bans.txt', 'w') as f:
                 for ban in bans:
-                    f.write('{} "{}"\n'.format(ban.challonge, ban.end.strftime('%B %d, %Y')))
+                    f.write('{} "{}" "{}"\n'.format(ban.challonge, ban.end.strftime('%B %d, %Y')), ban.reason)
                     banned_usernames.append(ban.challonge)
 
     # update the seed based on position on the list
@@ -324,23 +324,24 @@ def banish(message):
         return irc.Response('You are not authorised to use this command', pm_user=True)
 
     if message.text == '!banish help':
-        return irc.Response('!banish <username> <days> -- bans a challonge username for days length', pm_user=True)
+        return irc.Response('!banish <username> <days> [reason]-- bans a challonge username for days length', pm_user=True)
 
     if message.text.strip() == '!banish':
         with open('bans.txt') as f:
             result = []
             for line in f:
                 parts = shlex.split(line)
-                result.append('User {0[0]} is banned until {0[1]}'.format(parts))
+                result.append('{0[0]} is banned until {0[1]} for "{0[2]}"'.format(parts))
             return irc.Response('\n'.join(result), pm_user=True)
 
     words = message.text.split(' ')
-    if len(words) != 3:
+    if len(words) < 3:
         return irc.Response('Incorrect format. Check !banish help for more info', pm_user=True)
 
     with open('bans.txt', 'a') as f:
         end_date = dt.date.today() + dt.timedelta(days=int(words[2]))
-        f.write('{} "{}"\n'.format(words[1], end_date.strftime('%B %d, %Y')))
+        reason = ' '.join(words[3:])
+        f.write('{} "{}" "{}"\n'.format(words[1], end_date.strftime('%B %d, %Y'), reason))
 
     return irc.Response('User {} successfully banished for {} days'.format(words[1], words[2]), pm_user=True)
 
