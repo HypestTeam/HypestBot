@@ -310,7 +310,14 @@ def prepare(message):
             return irc.Response('Unable to access challonge API [error: {}]'.format(r.text), pm_user=True)
         seed += 1
 
-    return irc.Response('Tournament has successfully been prepared.', pm_user=True)
+    # prepare statistics
+    result = [ 'Tournament has successfully been prepared' ]
+    newcomers = sum(1 for user in users if user.rating == 0)
+    result.append('Total number of participants: {}'.format(len(users)))
+    result.append('Newcomers joined: {}'.format(newcomers))
+    result.append('Frequent users: {}'.format(len(users) - newcomers))
+    result.append('Banned users: {}'.format(len(banned_usernames)))
+    return irc.Response('\n'.join(result), pm_user=True)
 
 def banish(message):
     if message.nick not in conf.get('owners', []):
