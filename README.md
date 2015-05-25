@@ -38,7 +38,7 @@ someone who isn't an owner uses an owner only command then the user is PM'd an e
 - `!owners`: Manages the owners of the bot. Type `!owners help` for more info.
 - `!leave`: Leaves the current channel.
 - `!exit`: Quits the bot.
-- `!seed`: Seeds the challonge bracket provided with the TPS score.
+- `!prepare`: Prepares the challonge bracket provided with the current ranking and also removes banned users.
 
 #### General Commands
 
