@@ -172,7 +172,8 @@ def rank(message):
     ranking = [x['challonge_username'] for x in ranking]
     # check the player placing
     stats = 'Rating: {0} (Wins: {1}, Losses: {2}, Ties: {3}) [W/L Ratio: {4:.2}]'
-    stats = stats.format(entry['rating'], entry['wins'], entry['losses'], entry['ties'], float(entry['wins'])/entry['losses'])
+    ratio = float(entry['wins']) if entry['losses'] == 0 else float(entry['wins'])/entry['losses']
+    stats = stats.format(entry['rating'], entry['wins'], entry['losses'], entry['ties'], ratio)
 
     try:
         place = ranking.index(entry['challonge_username'])
@@ -284,13 +285,14 @@ def prepare(message):
         if old_ban_lines != len(bans):
             with open('bans.txt', 'w') as f:
                 for ban in bans:
-                    f.write('{} "{}" "{}"\n'.format(ban.challonge, ban.end.strftime('%B %d, %Y')), ban.reason)
+                    f.write('{} "{}" "{}"\n'.format(ban.challonge, ban.end.strftime('%B %d, %Y'), ban.reason))
                     banned_usernames.append(ban.challonge)
 
     # update the seed based on position on the list
     # the seeds.txt file is used as a way to debug if something goes wrong in the future
     f = open('seeds.txt', 'w')
     seed = 1
+    removed_users = []
     for user in users:
         params = {
             'api_key': api_key
@@ -298,6 +300,7 @@ def prepare(message):
 
         # check if a user is banned, and if so remove them from the seeding calculation
         if user.name in banned_usernames:
+            removed_users.append(user.name)
             r = requests.delete('https://api.challonge.com/v1/tournaments/{}/participants/{}.json'.format(url, user.id), params=params)
             if r.status_code != 200:
                 return irc.Response('Unable to access challonge API [error: {}]'.format(r.text), pm_user=True)
@@ -316,7 +319,10 @@ def prepare(message):
     result.append('Total number of participants: {}'.format(len(users)))
     result.append('Newcomers joined: {}'.format(newcomers))
     result.append('Frequent users: {}'.format(len(users) - newcomers))
-    result.append('Banned users: {}'.format(len(banned_usernames)))
+    result.append('Users removed due to ban: {}'.format(len(removed_users)))
+    if len(removed_users) > 0:
+        result.append('These users were: {}'.format(', '.join(removed_users)))
+
     return irc.Response('\n'.join(result), pm_user=True)
 
 def banish(message):
