@@ -5,6 +5,7 @@ import json
 import urllib
 import csv
 import re, os, sys
+import time
 import codecs
 import datetime as dt
 import shlex
@@ -378,7 +379,7 @@ def faq(message):
     return irc.Response("http://goo.gl/EUbs9X")
 
 def conduct(message):
-    return irc.Response("http://goo.gl/FvbxHm")
+    return irc.Response("https://goo.gl/ga83zj")
 
 def tutorial(message):
     return irc.Response("http://goo.gl/wRFPoU")
