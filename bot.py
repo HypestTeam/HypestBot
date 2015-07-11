@@ -11,28 +11,20 @@ import datetime as dt
 import shlex
 import requests
 from collections import namedtuple
+from functools import wraps
+from ranking import *
 
 # global configuration
 conf = {}
 
-# a global mapping of game ids to filename
-game_to_filename = {
-    '3ds': 'ssb3ds.json',
-    'wiiu': 'ssbwiiu.json',
-    'melee': 'ssbm.json',
-    'brawl': 'ssbb.json',
-    'projectm': 'projectm.json',
-    'ssf2': 'ssf2.json',
-    '64': 'ssb64.json',
-    16869: 'ssb3ds.json',
-    20988: 'ssbwiiu.json',
-    394: 'ssbm.json',
-    393: 'ssbb.json',
-    392: 'ssb64.json',
-    597: 'projectm.json',
-    1106: 'ssf2.json'
-}
-
+def owners_only(command):
+    """A decorator to make a command owner-only"""
+    @wraps(command)
+    def wrapped_up(message):
+        if message.nick not in conf.get('owners', []):
+            return irc.Response('Sorry, you are not an owner thus not authorised to use this command', pm_user=True)
+        return command(message)
+    return wrapped_up
 
 def bracket(message):
     channel = message.channel_used()
@@ -57,15 +49,10 @@ def rules(message):
     return irc.Response(rules.get(channel, 'Unknown rules found, please see !change help'))
 
 def phonebook(message):
-    # posts the phonebook
     return irc.Response('https://docs.google.com/spreadsheets/d/1dsoA_emnkmuroDZV9plDVPY-pQBtaUcnxLcaXQ7g06Y/')
 
+@owners_only
 def change(message):
-    # allows 'owners' to modify the database
-    # if you're not an owner, so just ignore the message
-    if message.nick not in conf.get('owners', []):
-        return irc.Response('Sorry, you are not an owner thus not authorised to use this command', pm_user=True)
-
     if message.text == '!change help':
         return irc.Response('!change bracket <url> -- updates the brackets\n!change rules <url> -- updates the rules\n', pm_user=True)
 
@@ -92,12 +79,8 @@ def change(message):
     update_config(conf)
     return irc.Response('Successfully updated', pm_user=True)
 
+@owners_only
 def owners(message):
-    list_of_owners = conf.get('owners', [])
-    # allows an owner to modify the owner list
-    if message.nick not in list_of_owners:
-        return irc.Response('Sorry, you are not an owner thus not authorised to use this command', pm_user=True)
-
     if message.text == '!owners help':
         return irc.Response('!owners add <nick> -- adds an owner\n!owners remove <nick> -- removes an owner'\
                             '!owners -- lists all current owners', pm_user=True)
@@ -199,10 +182,8 @@ def streams(message):
     return irc.Response('\n'.join(result))
 
 # prepares the bracket by seeding and removing banned players
+@owners_only
 def prepare(message):
-    if message.nick not in conf.get('owners', []):
-        return irc.Response('You are not authorised to use this command', pm_user=True)
-
     if len(message.words) != 2:
         return irc.Response('Incorrect format. Must be !prepare <url>', pm_user=True)
 
@@ -326,10 +307,8 @@ def prepare(message):
 
     return irc.Response('\n'.join(result), pm_user=True)
 
+@owners_only
 def banish(message):
-    if message.nick not in conf.get('owners', []):
-        return irc.Response('You are not authorised to use this command', pm_user=True)
-
     if message.text == '!banish help':
         return irc.Response('!banish <username> <days> [reason]-- bans a challonge username for days length', pm_user=True)
 
@@ -352,10 +331,8 @@ def banish(message):
 
     return irc.Response('User {} successfully banished for {} days'.format(words[1], words[2]), pm_user=True)
 
+@owners_only
 def unbanish(message):
-    if message.nick not in conf.get('owners', []):
-        return irc.Response('You are not authorised to use this command', pm_user=True)
-
     if message.text == '!unbanish help':
         return irc.Response('!unbanish <username> -- prematurely unbans a challonge username', pm_user=True)
 
@@ -371,6 +348,31 @@ def unbanish(message):
         f.write(''.join(bans))
 
     return irc.Response('User {} successfully unbanished'.format(words[1]), pm_user=True)
+
+@owners_only
+def delta(message):
+    current_time = dt.datetime.now()
+    round_end = current_time + dt.timedelta(minutes=40)
+    game_one_end = current_time + dt.timedelta(minutes=10)
+    round_loss = current_time + dt.timedelta(minutes=15)
+    time_format = '%I:%M:%S %p'
+    result = []
+    result.append('Current Time: {}'.format(current_time.strftime(time_format)))
+    result.append('Game 1 loss is given at {}'.format(game_one_end.strftime(time_format)))
+    result.append('Entire round loss is given at {}'.format(round_loss.strftime(time_format)))
+    result.append('Round ends at {}'.format(round_end.strftime(time_format)))
+    return irc.Response('\n'.join(result), pm_user=True)
+
+
+# The 'season' command will be split up into multiple subcommands
+# These could be invoked via season_<type>(message) in a semi-dynamic fashion.
+# But for now just get something basic going
+# @owners_only
+# def season_rank(message):
+#
+#
+# def season(message):
+
 
 def form(message):
     return irc.Response("http://goo.gl/CfFKeO")
@@ -411,6 +413,7 @@ if __name__ == '__main__':
     bot.add_command('streams', streams)
     bot.add_command('rank', rank)
     bot.add_command('prepare', prepare)
+    bot.add_command('delta', delta)
     bot.add_command('form', form)
     bot.add_command('banish', banish)
     bot.add_command('unbanish', unbanish)
