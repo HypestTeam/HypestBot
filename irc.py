@@ -2,6 +2,8 @@ import socket, time
 import re, string
 import traceback
 
+command_prefix = '!'
+
 """
 Represents an IRC message
 """
@@ -22,7 +24,7 @@ class Message(object):
             self.command = match.group('command')
             self.parameters = match.group('parameters')
             self.text = match.group('text')
-            self.valid_command = self.text != None and self.text[0] == '!'
+            self.valid_command = self.text != None and self.text[0] == command_prefix
             self.words = [word.rstrip(string.punctuation) for word in self.text.split()] if self.text != None else []
 
     def __len__(self):
@@ -51,7 +53,6 @@ class Bot(object):
         self.channels = kwargs['channels']
         self.nickname = kwargs['nickname']
         self.password = kwargs['password']
-        self.owners = kwargs.get('owners', [])
         self.port = kwargs.get('port', 6667)
         self.login_command = kwargs.get('login', None)
         self.response = ''
@@ -96,6 +97,11 @@ class Bot(object):
         if len(self.channels) == 0:
             self.running = False
 
+    def quit(self):
+        for channel in self.channels:
+            self.disconnect(channel, 'quitting bot')
+        self.running = False
+
     def join(self):
         for channel in self.channels:
             print('joining ' + channel)
@@ -104,16 +110,16 @@ class Bot(object):
     def add_owner(self, owner):
         self.owners.append(owner)
 
-    # a command is basically a python function associated with a command string.
-    # the command string will then be prepended with ! and when the user executes
-    # !command in IRC, then the function will be executed with an irc.Message object
-    # as its parameter.
-    # The function is expected to return either a string or None. None denotes that no
-    # message will be sent to the IRC server, while a string will be sent. The string is
-    # split at '\n' to denote multiple messages to send, use this to your advantage if
-    # needed.
-    def add_command(self, command, function):
-        self.commands['!' + command.lower()] = function
+    def add_command(self, command):
+        """Adds a command to the bot.
+           A command is basically a python function associated. The command string is
+           equivalent to command_prefix + command.__name__. The command expects the bot
+           to be the parameter. The function is expected to return either a irc.Response or None.
+           None denotes that no message will be sent to the IRC server, while a irc.Response will be sent.
+           The irc.Response is split at '\\n' to denote multiple messages to send.
+           Note that you can also send a message through the member functions of the bot."""
+
+        self.commands[command_prefix + command.__name__.lower()] = command
 
     def sign_in(self):
         print('signing in...')
@@ -145,28 +151,15 @@ class Bot(object):
 
             if self.message.valid_command:
                 print(self.response)
-                if self.message.text.startswith('!botcommands'):
-                    self.send_message(self.message.nick, 'available commands:')
-                    if len(self.commands) == 0:
-                        self.send_message(self.message.nick, 'none found!')
-                    else:
-                        self.send_message(self.message.nick, ', '.join(self.commands.keys()))
-                elif self.message.text.startswith('!leave') and self.message.nick in self.owners:
-                    self.disconnect(self.current_channel, 'pew pew pew')
-                elif self.message.text.startswith('!quit') and self.message.nick in self.owners:
-                    for channel in self.channels:
-                        self.disconnect(channel, 'quitting bot')
-                    self.running = False
-                else:
-                    function = self.commands.get(self.message.words[0].lower(), None)
-                    if function == None:
-                        print('unknown command found : ' + self.message.text)
-                    try:
-                        result = function(self.message)
-                        if result:
-                            messages = result.message.split('\n')
-                            for item in messages:
-                                self.send_message(self.current_channel if not result.pm_user else self.message.nick, item)
-                    except Exception as e:
-                        print('error found:')
-                        print(traceback.format_exc())
+                function = self.commands.get(self.message.words[0].lower(), None)
+                if function == None:
+                    print('unknown command found : ' + self.message.text)
+                try:
+                    result = function(self)
+                    if result:
+                        messages = result.message.split('\n')
+                        for item in messages:
+                            self.send_message(self.current_channel if not result.pm_user else self.message.nick, item)
+                except Exception as e:
+                    print('error found:')
+                    print(traceback.format_exc())

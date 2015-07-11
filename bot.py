@@ -20,14 +20,30 @@ conf = {}
 def owners_only(command):
     """A decorator to make a command owner-only"""
     @wraps(command)
-    def wrapped_up(message):
-        if message.nick not in conf.get('owners', []):
+    def wrapped_up(bot):
+        if bot.message.nick not in conf.get('owners', []):
             return irc.Response('Sorry, you are not an owner thus not authorised to use this command', pm_user=True)
-        return command(message)
+        return command(bot)
     return wrapped_up
 
-def bracket(message):
-    channel = message.channel_used()
+def botcommands(bot):
+    result = 'available commands:\n'
+    if len(bot.commands) == 0:
+        result += 'none found!'
+    else:
+        result += ', '.join(bot.commands.keys())
+    return irc.Response(result, pm_user=True)
+
+@owners_only
+def leave(bot):
+    bot.disconnect(bot.current_channel, 'pew pew pew')
+
+@owners_only
+def quit(bot):
+    bot.quit()
+
+def bracket(bot):
+    channel = bot.current_channel
     brackets = conf.get('bracket', None)
     if not channel.startswith('#'):
         return irc.Response('This command must be used outside of private messages', pm_user=True)
@@ -37,8 +53,8 @@ def bracket(message):
 
     return irc.Response(brackets.get(channel, 'Unknown bracket found, please see !change help'))
 
-def rules(message):
-    channel = message.channel_used()
+def rules(bot):
+    channel = bot.current_channel
     rules = conf.get('rules', None)
     if not channel.startswith('#'):
         return irc.Response('This command must be used outside of private messages', pm_user=True)
@@ -48,20 +64,20 @@ def rules(message):
 
     return irc.Response(rules.get(channel, 'Unknown rules found, please see !change help'))
 
-def phonebook(message):
+def phonebook(bot):
     return irc.Response('https://docs.google.com/spreadsheets/d/1dsoA_emnkmuroDZV9plDVPY-pQBtaUcnxLcaXQ7g06Y/')
 
 @owners_only
-def change(message):
-    if message.text == '!change help':
+def change(bot):
+    if bot.message.text == '!change help':
         return irc.Response('!change bracket <url> -- updates the brackets\n!change rules <url> -- updates the rules\n', pm_user=True)
 
-    words = len(message.words)
+    words = len(bot.message.words)
     if words != 3:
         return irc.Response('Invalid amount of parameters (expected 3, received {}) check !change help'.format(words), pm_user=True)
 
-    command = message.words[1].lower()
-    channel = message.channel_used()
+    command = bot.message.words[1].lower()
+    channel = bot.current_channel
     if command not in ['bracket', 'rules']:
         return irc.Response('Invalid command given (!change {}) check !change help'.format(command), pm_user=True)
 
@@ -70,9 +86,9 @@ def change(message):
 
     info = conf.get(command, None)
     if info == None:
-        info = { channel: message.words[2] }
+        info = { channel: bot.message.words[2] }
     elif isinstance(info, dict):
-        info[channel] = message.words[2]
+        info[channel] = bot.message.words[2]
     else:
         return irc.Response('Unable to update {} due to invalid configuration type'.format(command))
     conf[command] = info
@@ -80,22 +96,22 @@ def change(message):
     return irc.Response('Successfully updated', pm_user=True)
 
 @owners_only
-def owners(message):
-    if message.text == '!owners help':
+def owners(bot):
+    if bot.message.text == '!owners help':
         return irc.Response('!owners add <nick> -- adds an owner\n!owners remove <nick> -- removes an owner'\
                             '!owners -- lists all current owners', pm_user=True)
 
-    args = len(message.words)
+    args = len(bot.message.words)
     if args == 1:
         return irc.Response('list of owners:\n' + '\n'.join(list_of_owners), pm_user=True)
     elif args != 3:
         return irc.Response('Invalid amount of parameters (expected 3, received {}) check !owners help'.format(args), pm_user=True)
 
-    command = message.words[1].lower()
+    command = bot.message.words[1].lower()
     if command not in ['add', 'remove']:
         return irc.Response('Invalid command given ({}) check !owners help'.format(command), pm_user=True)
 
-    owner = message.words[2]
+    owner = bot.message.words[2]
     if command == 'add':
         list_of_owners.append(owner)
     elif command == 'remove':
@@ -107,12 +123,12 @@ def owners(message):
     update_config(conf)
     return irc.Response('Successfully updated', pm_user=True)
 
-def rank(message):
+def rank(bot):
     directory = conf.get('ranking_directory', None)
     if directory == None or not os.path.exists(directory):
         return irc.Response('Internal error occurred: no directory for databases', pm_user=True)
 
-    if message.text == '!rank help':
+    if bot.message.text == '!rank help':
         resp = [ '!rank 3ds <challonge username> -- Returns your ranking for Smash 3DS',
                  '!rank wiiu <challonge username> -- Returns your ranking for Smash Wii U',
                  '!rank melee <challonge username> -- Returns your ranking for Melee',
@@ -123,7 +139,7 @@ def rank(message):
                ]
         return irc.Response('\n'.join(resp), pm_user=True)
 
-    words = message.text.split(' ')
+    words = bot.message.text.split(' ')
     if len(words) != 3:
         return irc.Response('Invalid format given. Check !rank help for more info', pm_user=True)
 
@@ -166,14 +182,14 @@ def rank(message):
     except Exception as e:
         return irc.Response(stats, pm_user=True)
 
-def streams(message):
+def streams(bot):
     result = []
     pastebin = "http://pastebin.com/raw.php?i=x5qCS5Gz"
     data = urllib.urlopen(pastebin)
     reader = csv.reader(data)
     round_filter = None
-    if len(message.words) > 1:
-        round_filter = message.words[1]
+    if len(bot.message.words) > 1:
+        round_filter = bot.message.words[1]
     for row in reader:
         if round_filter != None and row[0] != round_filter:
             continue
@@ -183,8 +199,8 @@ def streams(message):
 
 # prepares the bracket by seeding and removing banned players
 @owners_only
-def prepare(message):
-    if len(message.words) != 2:
+def prepare(bot):
+    if len(bot.message.words) != 2:
         return irc.Response('Incorrect format. Must be !prepare <url>', pm_user=True)
 
     directory = conf.get('ranking_directory', None)
@@ -195,7 +211,7 @@ def prepare(message):
     if api_key == None:
         return irc.Response('No Challonge API key has been set in config', pm_user=True)
 
-    m = re.match(r'(?:https?\:\/\/)?(?:(?P<subdomain>\w*)\.)?challonge\.com\/(?P<url>\w*)', message.words[1])
+    m = re.match(r'(?:https?\:\/\/)?(?:(?P<subdomain>\w*)\.)?challonge\.com\/(?P<url>\w*)', bot.message.words[1])
     url = m.group('url')
     if m.group('subdomain'):
         url = '{}-{}'.format(m.group('subdomain'), m.group('url'))
@@ -308,11 +324,11 @@ def prepare(message):
     return irc.Response('\n'.join(result), pm_user=True)
 
 @owners_only
-def banish(message):
-    if message.text == '!banish help':
+def banish(bot):
+    if bot.message.text == '!banish help':
         return irc.Response('!banish <username> <days> [reason]-- bans a challonge username for days length', pm_user=True)
 
-    if message.text.strip() == '!banish':
+    if bot.message.text.strip() == '!banish':
         with open('bans.txt') as f:
             result = []
             for line in f:
@@ -320,7 +336,7 @@ def banish(message):
                 result.append('{0[0]} is banned until {0[1]} for "{0[2]}"'.format(parts))
             return irc.Response('\n'.join(result), pm_user=True)
 
-    words = message.text.split(' ')
+    words = bot.message.text.split(' ')
     if len(words) < 3:
         return irc.Response('Incorrect format. Check !banish help for more info', pm_user=True)
 
@@ -332,11 +348,11 @@ def banish(message):
     return irc.Response('User {} successfully banished for {} days'.format(words[1], words[2]), pm_user=True)
 
 @owners_only
-def unbanish(message):
-    if message.text == '!unbanish help':
+def unbanish(bot):
+    if bot.message.text == '!unbanish help':
         return irc.Response('!unbanish <username> -- prematurely unbans a challonge username', pm_user=True)
 
-    words = message.text.split(' ')
+    words = bot.message.text.split(' ')
     if len(words) != 2:
         return irc.Response('Incorrect format. Check !unbanish help for more info', pm_user=True)
 
@@ -350,7 +366,7 @@ def unbanish(message):
     return irc.Response('User {} successfully unbanished'.format(words[1]), pm_user=True)
 
 @owners_only
-def delta(message):
+def delta(bot):
     current_time = dt.datetime.now()
     round_end = current_time + dt.timedelta(minutes=40)
     game_one_end = current_time + dt.timedelta(minutes=10)
@@ -365,31 +381,31 @@ def delta(message):
 
 
 # The 'season' command will be split up into multiple subcommands
-# These could be invoked via season_<type>(message) in a semi-dynamic fashion.
+# These could be invoked via season_<type>(bot) in a semi-dynamic fashion.
 # But for now just get something basic going
 # @owners_only
-# def season_rank(message):
+# def season_rank(bot):
 #
 #
-# def season(message):
+# def season(bot):
 
 
-def form(message):
+def form(bot):
     return irc.Response("http://goo.gl/CfFKeO")
 
-def faq(message):
+def faq(bot):
     return irc.Response("http://goo.gl/EUbs9X")
 
-def conduct(message):
+def conduct(bot):
     return irc.Response("https://goo.gl/ga83zj")
 
-def tutorial(message):
+def tutorial(bot):
     return irc.Response("http://goo.gl/wRFPoU")
 
-def ranking(message):
+def ranking(bot):
     return irc.Response("http://www.reddit.com/r/smashbros/wiki/rankings")
 
-def calendar(message):
+def calendar(bot):
     return irc.Response("http://www.reddit.com/r/smashbros/wiki/eventcalendar")
 
 def load_config():
@@ -405,21 +421,24 @@ if __name__ == '__main__':
     reload(sys)
     sys.setdefaultencoding('utf-8')
     bot = irc.Bot(**conf)
-    bot.add_command('bracket', bracket)
-    bot.add_command('rules', rules)
-    bot.add_command('phonebook', phonebook)
-    bot.add_command('change', change)
-    bot.add_command('owners', owners)
-    bot.add_command('streams', streams)
-    bot.add_command('rank', rank)
-    bot.add_command('prepare', prepare)
-    bot.add_command('delta', delta)
-    bot.add_command('form', form)
-    bot.add_command('banish', banish)
-    bot.add_command('unbanish', unbanish)
-    bot.add_command('faq', faq)
-    bot.add_command('conduct', conduct)
-    bot.add_command('tutorial', tutorial)
-    bot.add_command('ranking', ranking)
-    bot.add_command('calendar', calendar)
+    bot.add_command(botcommands)
+    bot.add_command(quit)
+    bot.add_command(leave)
+    bot.add_command(bracket)
+    bot.add_command(rules)
+    bot.add_command(phonebook)
+    bot.add_command(change)
+    bot.add_command(owners)
+    bot.add_command(streams)
+    bot.add_command(rank)
+    bot.add_command(prepare)
+    bot.add_command(delta)
+    bot.add_command(form)
+    bot.add_command(banish)
+    bot.add_command(unbanish)
+    bot.add_command(faq)
+    bot.add_command(conduct)
+    bot.add_command(tutorial)
+    bot.add_command(ranking)
+    bot.add_command(calendar)
     bot.run()
