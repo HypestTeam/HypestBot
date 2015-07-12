@@ -110,15 +110,15 @@ def requirements(length=2, subcommands=None):
 def botcommands(bot):
     bot.send_message(bot.message.nick, 'available commands:\n')
     is_owner = bot.message.nick in conf.get('owners', [])
-
+    offset = len(max(bot.commands, key=lambda k: len(k))) + 2
     for key in bot.commands:
         command = bot.commands[key]
         is_owner_only = hasattr(command, 'owner_only')
         text = command.func_dict.get('help', None)
-        format_string = '{command} -- {help}' if text else '{command}'
+        format_string = '{command:<{offset}} -- {help}' if text else '{command:<{offset}}'
         if not is_owner and is_owner_only:
             continue
-        bot.send_message(bot.message.nick, format_string.format(command=key, help=text))
+        bot.send_message(bot.message.nick, format_string.format(command=key, help=text, offset=offset))
     if len(bot.commands) == 0:
         bot.send_message(bot.message.nick, 'none found!')
 
