@@ -110,7 +110,7 @@ class Bot(object):
     def add_owner(self, owner):
         self.owners.append(owner)
 
-    def add_command(self, command, help_text=None):
+    def add_command(self, command):
         """Adds a command to the bot.
            A command is basically a python function associated. The command string is
            equivalent to command_prefix + command.__name__. The command expects the bot
@@ -119,7 +119,7 @@ class Bot(object):
            The irc.Response is split at '\\n' to denote multiple messages to send.
            Note that you can also send a message through the member functions of the bot."""
 
-        self.commands[command_prefix + command.__name__.lower()] = { 'command': command, 'help': help_text }
+        self.commands[command_prefix + command.__name__.lower()] = command
 
     def sign_in(self):
         print('signing in...')
@@ -157,7 +157,7 @@ class Bot(object):
                 if function == None:
                     print('unknown command found : ' + self.message.text)
                 try:
-                    result = function['command'](self)
+                    result = function(self)
                     if result:
                         messages = result.message.split('\n')
                         for item in messages:

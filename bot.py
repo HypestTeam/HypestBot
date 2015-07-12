@@ -27,14 +27,86 @@ def owners_only(command):
     wrapped_up.owner_only = True
     return wrapped_up
 
+def help_text(main=None, **text):
+    """A decorator that provides help for a command and its subcommands.
+
+       To provide help for the main command, the keyword argument used
+       must be 'main' or none at all. The rest follow the subcommand=text pattern.
+       For example, @help_text(main='does stuff', other='one', three='stuff')
+       Would give you help text for !command, !command other, and !command three
+       where ! is the irc.command_prefix
+
+       If an argument is needed to be displayed in the command help output, then pass a tuple
+       or list with two items with the extra information right before the text. For example:
+       @help_text('hello', one=('<stuff>', 'does things') would result in the following string:
+       !command one <stuff> -- does things
+
+       The same principle applies with the main keyword argument."""
+
+    main_is_verbose = isinstance(main, tuple) or isinstance(main, list)
+    def actual_decorator(command):
+        @wraps(command)
+        def wrapper(bot):
+            if len(bot.message.words) >= 2 and bot.message.words[1] == 'help':
+                command_text = irc.command_prefix + command.__name__.lower()
+                format_string = command_text + ' {subcommand} -- {help}'
+                verbose_format = command_text + ' {subcommand} {help[0]} -- {help[1]}'
+                if main:
+                    if main_is_verbose:
+                        bot.send_message(bot.message.nick, '{0} {1[0]} -- {1[1]}'.format(command_text, main))
+                    else:
+                        bot.send_message(bot.message.nick, ('{} -- {}'.format(command_text, main)))
+                bot.send_message(bot.message.nick, format_string.format(subcommand='help', help='shows this message'))
+                for subcommand in text:
+                    value = text[subcommand]
+                    temp = format_string
+                    if isinstance(value, tuple) or isinstance(value, list):
+                        temp = verbose_format
+                    bot.send_message(bot.message.nick, temp.format(subcommand=subcommand, help=value))
+            else:
+                return command(bot)
+
+        if main_is_verbose:
+            wrapper.help = main[1]
+        else:
+            wrapper.help = main
+        wrapper.subcommand_help = text
+        return wrapper
+    return actual_decorator
+
+def requirements(length=2, subcommands=None):
+    """A decorator to help with requirements in formatting for subcommands
+
+       Currently supported are length and subcommands. length checks that there
+       are at least length words passed while subcommands checks if the second word
+       is in the list of valid options"""
+    def actual_decorator(command):
+        @wraps(command)
+        def wrapper(bot):
+            # check for length requirement
+            command_name = irc.command_prefix + command.__name__.lower()
+            number_of_words = len(bot.message.words)
+            if number_of_words < length:
+                temp = 'Incorrect number of arguments passed (received {}, expected {}). Try {} help'
+                return irc.Response(temp.format(number_of_words, length, command_name), pm_user=True)
+
+            # check for subcommand requirement
+            if number_of_words >= 2 and subcommands and bot.message.words[1] not in subcommands:
+                return irc.Response('Incorrect subcommand passed. Try {} help'.format(command_name), pm_user=True)
+
+            return command(bot)
+        return wrapper
+    return actual_decorator
+
+@help_text('shows a list of commands')
 def botcommands(bot):
     bot.send_message(bot.message.nick, 'available commands:\n')
     is_owner = bot.message.nick in conf.get('owners', [])
 
     for key in bot.commands:
-        value = bot.commands[key]
-        is_owner_only = hasattr(value['command'], 'owner_only')
-        text = value.get('help', None)
+        command = bot.commands[key]
+        is_owner_only = hasattr(command, 'owner_only')
+        text = command.func_dict.get('help', None)
         format_string = '{command} -- {help}' if text else '{command}'
         if not is_owner and is_owner_only:
             continue
@@ -43,13 +115,16 @@ def botcommands(bot):
         bot.send_message(bot.message.nick, 'none found!')
 
 @owners_only
+@help_text('leaves the current channel')
 def leave(bot):
     bot.disconnect(bot.current_channel, 'pew pew pew')
 
 @owners_only
+@help_text('quits the bot')
 def quit(bot):
     bot.quit()
 
+@help_text('provides the bracket for the current channel')
 def bracket(bot):
     channel = bot.current_channel
     brackets = conf.get('bracket', None)
@@ -61,6 +136,7 @@ def bracket(bot):
 
     return irc.Response(brackets.get(channel, 'Unknown bracket found, please see !change help'))
 
+@help_text('provides the rules for the current channel tournament')
 def rules(bot):
     channel = bot.current_channel
     rules = conf.get('rules', None)
@@ -72,23 +148,16 @@ def rules(bot):
 
     return irc.Response(rules.get(channel, 'Unknown rules found, please see !change help'))
 
+@help_text('provides the Hypest official phonebook')
 def phonebook(bot):
     return irc.Response('https://docs.google.com/spreadsheets/d/1dsoA_emnkmuroDZV9plDVPY-pQBtaUcnxLcaXQ7g06Y/')
 
 @owners_only
+@help_text('changes the bracket and rules URLs', bracket=('<url>', 'updates the brackets'), rules=('<url>', 'updates the rules'))
+@requirements(length=3, subcommands=['bracket', 'rules'])
 def change(bot):
-    if bot.message.text == '!change help':
-        return irc.Response('!change bracket <url> -- updates the brackets\n!change rules <url> -- updates the rules\n', pm_user=True)
-
-    words = len(bot.message.words)
-    if words != 3:
-        return irc.Response('Invalid amount of parameters (expected 3, received {}) check !change help'.format(words), pm_user=True)
-
     command = bot.message.words[1].lower()
     channel = bot.current_channel
-    if command not in ['bracket', 'rules']:
-        return irc.Response('Invalid command given (!change {}) check !change help'.format(command), pm_user=True)
-
     if not channel.startswith('#'):
         return irc.Response('This command must be used outside of private messages', pm_user=True)
 
@@ -104,11 +173,9 @@ def change(bot):
     return irc.Response('Successfully updated', pm_user=True)
 
 @owners_only
+@help_text('manages the list of owners', add=('<nick>', 'adds an owner'), remove=('<nick>', 'removes an owner'), list='lists the current owners')
+@requirements(subcommands=['add', 'remove', 'list'], length=0)
 def owners(bot):
-    if bot.message.text == '!owners help':
-        return irc.Response('!owners add <nick> -- adds an owner\n!owners remove <nick> -- removes an owner'\
-                            '!owners -- lists all current owners', pm_user=True)
-
     args = len(bot.message.words)
     if args == 1:
         return irc.Response('list of owners:\n' + '\n'.join(list_of_owners), pm_user=True)
@@ -131,25 +198,22 @@ def owners(bot):
     update_config(conf)
     return irc.Response('Successfully updated', pm_user=True)
 
+@help_text('accesses ranking information for different games',**{
+           '3ds': ('<challonge username>', 'Returns your ranking for Smash 3DS'),
+           'wiiu': ('<challonge username>', 'Returns your ranking for Smash Wii U'),
+           'melee': ('<challonge username>', 'Returns your ranking for Melee'),
+           'brawl': ('<challonge username>', 'Returns your ranking for Brawl'),
+           'ssf2': ('<challonge username>', 'Returns your ranking for Super Smash Flash 2'),
+           '64': ('<challonge username>', 'Returns your ranking for Smash 64'),
+           'projectm': ('<challonge username>', 'Returns your ranking for Project M'),
+           })
+@requirements(length=3, subcommands=['3ds', 'melee', 'wiiu', 'brawl', 'ssf2', '64', 'projectm'])
 def rank(bot):
     directory = conf.get('ranking_directory', None)
     if directory == None or not os.path.exists(directory):
         return irc.Response('Internal error occurred: no directory for databases', pm_user=True)
 
-    if bot.message.text == '!rank help':
-        resp = [ '!rank 3ds <challonge username> -- Returns your ranking for Smash 3DS',
-                 '!rank wiiu <challonge username> -- Returns your ranking for Smash Wii U',
-                 '!rank melee <challonge username> -- Returns your ranking for Melee',
-                 '!rank brawl <challonge username> -- Returns your ranking for Brawl',
-                 '!rank ssf2 <challonge username> -- Returns your ranking for Super Smash Flash 2',
-                 '!rank 64 <challonge username> -- Returns your ranking for Smash 64',
-                 '!rank projectm <challonge username> -- Returns your ranking for Project M'
-               ]
-        return irc.Response('\n'.join(resp), pm_user=True)
-
     words = bot.message.text.split(' ')
-    if len(words) != 3:
-        return irc.Response('Invalid format given. Check !rank help for more info', pm_user=True)
 
     filename = game_to_filename.get(words[1].lower(), None)
     if filename == None:
@@ -190,6 +254,7 @@ def rank(bot):
     except Exception as e:
         return irc.Response(stats, pm_user=True)
 
+@help_text('lists current streams using the pastebin URL')
 def streams(bot):
     result = []
     pastebin = "http://pastebin.com/raw.php?i=x5qCS5Gz"
@@ -207,10 +272,9 @@ def streams(bot):
 
 # prepares the bracket by seeding and removing banned players
 @owners_only
+@help_text('prepares the bracket by seeding and removing banned users')
+@requirements(length=2)
 def prepare(bot):
-    if len(bot.message.words) != 2:
-        return irc.Response('Incorrect format. Must be !prepare <url>', pm_user=True)
-
     directory = conf.get('ranking_directory', None)
     if directory == None or not os.path.exists(directory):
         return irc.Response('No ranking database has been found. Sorry.', pm_user=True)
@@ -332,10 +396,9 @@ def prepare(bot):
     return irc.Response('\n'.join(result), pm_user=True)
 
 @owners_only
+@help_text(main=('<username> <days> [reason]', 'bans players from participating in our tournaments'))
+@requirements(length=3)
 def banish(bot):
-    if bot.message.text == '!banish help':
-        return irc.Response('!banish <username> <days> [reason]-- bans a challonge username for days length', pm_user=True)
-
     if bot.message.text.strip() == '!banish':
         with open('bans.txt') as f:
             result = []
@@ -345,9 +408,6 @@ def banish(bot):
             return irc.Response('\n'.join(result), pm_user=True)
 
     words = bot.message.text.split(' ')
-    if len(words) < 3:
-        return irc.Response('Incorrect format. Check !banish help for more info', pm_user=True)
-
     with open('bans.txt', 'a') as f:
         end_date = dt.date.today() + dt.timedelta(days=int(words[2]))
         reason = ' '.join(words[3:])
@@ -356,10 +416,9 @@ def banish(bot):
     return irc.Response('User {} successfully banished for {} days'.format(words[1], words[2]), pm_user=True)
 
 @owners_only
+@help_text(main=('<username>', 'unbans players'))
+@requirements(length=2)
 def unbanish(bot):
-    if bot.message.text == '!unbanish help':
-        return irc.Response('!unbanish <username> -- prematurely unbans a challonge username', pm_user=True)
-
     words = bot.message.text.split(' ')
     if len(words) != 2:
         return irc.Response('Incorrect format. Check !unbanish help for more info', pm_user=True)
@@ -374,6 +433,7 @@ def unbanish(bot):
     return irc.Response('User {} successfully unbanished'.format(words[1]), pm_user=True)
 
 @owners_only
+@help_text('provides a delta time to help with tournament organising')
 def delta(bot):
     current_time = dt.datetime.now()
     round_end = current_time + dt.timedelta(minutes=40)
@@ -387,32 +447,62 @@ def delta(bot):
     result.append('Round ends at {}'.format(round_end.strftime(time_format)))
     return irc.Response('\n'.join(result), pm_user=True)
 
+@owners_only
+@help_text('helps debug the bot')
+@requirements(subcommands=['print', 'execute'])
+def debug(bot):
+    words = bot.message.text.split(' ')
+    if words[1] == 'print':
+        if words < 4:
+            return irc.Response('the print command required at least 2 more arguments', pm_user=True)
+        subcommand = words[2]
+        lookup = {
+            'bot': bot,
+            'message': bot.message
+        }
+        if subcommand not in lookup:
+            return irc.Response('unknown debug subcommand ' + subcommand, pm_user=True)
+        obj = lookup[subcommand]
+        result = []
+        for variable in words[3:]:
+            if hasattr(obj, variable):
+                attr = getattr(obj, variable)
+                if callable(attr):
+                    # call it with no arguments
+                    result.append(str(attr()))
+                else:
+                    result.append(str(attr))
+            else:
+                result.append('no attribute found on {} for {}'.format(subcommand, variable))
+        return irc.Response('\n'.join(result), pm_user=True)
 
-# The 'season' command will be split up into multiple subcommands
-# These could be invoked via season_<type>(bot) in a semi-dynamic fashion.
-# But for now just get something basic going
-# @owners_only
-# def season_rank(bot):
-#
-#
-# def season(bot):
+    if words[1] == 'execute':
+        code = ' '.join(words[2:])
+        from ast import literal_eval
+        result = literal_eval(code)
+        return irc.Response(str(result), pm_user=True)
 
-
+@help_text('provides a URL to the phonebook form')
 def form(bot):
     return irc.Response("http://goo.gl/CfFKeO")
 
+@help_text('provides a URL to the FAQ')
 def faq(bot):
     return irc.Response("http://goo.gl/EUbs9X")
 
+@help_text('provides a URL our code of conduct')
 def conduct(bot):
     return irc.Response("https://goo.gl/ga83zj")
 
+@help_text('provides a URL to our IRC tutorial')
 def tutorial(bot):
     return irc.Response("http://goo.gl/wRFPoU")
 
+@help_text('provides a URL to the reddit rankings')
 def ranking(bot):
     return irc.Response("http://www.reddit.com/r/smashbros/wiki/rankings")
 
+@help_text('provides a URL to the event calendar')
 def calendar(bot):
     return irc.Response("http://www.reddit.com/r/smashbros/wiki/eventcalendar")
 
@@ -429,24 +519,25 @@ if __name__ == '__main__':
     reload(sys)
     sys.setdefaultencoding('utf-8')
     bot = irc.Bot(**conf)
-    bot.add_command(botcommands, 'shows a list of commands')
-    bot.add_command(quit, 'quits the bot')
-    bot.add_command(leave, 'leaves the current channel')
-    bot.add_command(bracket, 'provides the bracket for the channel')
-    bot.add_command(rules, 'provides the rules for the channel tournament')
-    bot.add_command(phonebook, 'provides the Hypest official phonebook')
-    bot.add_command(change, 'changes the bracket and rules URLs')
-    bot.add_command(owners, 'manages the list of owners')
-    bot.add_command(streams, 'lists current streams using the pastebin URL')
-    bot.add_command(rank, 'accesses ranking information for different games')
-    bot.add_command(prepare, 'prepares the bracket by seeding and removing banned users')
-    bot.add_command(delta, 'provides a delta time to help with tournament organising')
-    bot.add_command(form, 'provides the phonebook form')
-    bot.add_command(banish, 'bans players from participating in our tournaments')
-    bot.add_command(unbanish, 'unbans players')
-    bot.add_command(faq, 'provides the FAQ')
-    bot.add_command(conduct, 'provides our code of conduct')
-    bot.add_command(tutorial, 'provides our IRC tutorial')
-    bot.add_command(ranking, 'provides the reddit rankings')
-    bot.add_command(calendar, 'provides the event calendar')
+    bot.add_command(botcommands)
+    bot.add_command(quit)
+    bot.add_command(leave)
+    bot.add_command(bracket)
+    bot.add_command(rules)
+    bot.add_command(phonebook)
+    bot.add_command(change)
+    bot.add_command(owners)
+    bot.add_command(streams)
+    bot.add_command(rank)
+    bot.add_command(prepare)
+    bot.add_command(delta)
+    bot.add_command(form)
+    bot.add_command(banish)
+    bot.add_command(unbanish)
+    bot.add_command(faq)
+    bot.add_command(conduct)
+    bot.add_command(tutorial)
+    bot.add_command(ranking)
+    bot.add_command(calendar)
+    bot.add_command(debug)
     bot.run()
