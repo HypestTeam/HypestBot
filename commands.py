@@ -13,6 +13,7 @@ import requests
 from collections import namedtuple
 from functools import wraps
 import ranking as seasonal
+import threading
 
 # global configuration
 conf = {}
@@ -441,21 +442,6 @@ def unbanish(bot):
     return irc.Response('User {} successfully unbanished'.format(words[1]), pm_user=True)
 
 @owners_only
-@help_text('provides a delta time to help with tournament organising')
-def delta(bot):
-    current_time = dt.datetime.now()
-    round_end = current_time + dt.timedelta(minutes=40)
-    game_one_end = current_time + dt.timedelta(minutes=10)
-    round_loss = current_time + dt.timedelta(minutes=15)
-    time_format = '%I:%M:%S %p'
-    result = []
-    result.append('Current Time: {}'.format(current_time.strftime(time_format)))
-    result.append('Game 1 loss is given at {}'.format(game_one_end.strftime(time_format)))
-    result.append('Entire round loss is given at {}'.format(round_loss.strftime(time_format)))
-    result.append('Round ends at {}'.format(round_end.strftime(time_format)))
-    return irc.Response('\n'.join(result), pm_user=True)
-
-@owners_only
 @help_text('helps debug the bot')
 @requirements(subcommands=['print', 'execute'])
 def debug(bot):
@@ -572,6 +558,20 @@ def season(bot):
     # delegate work over to the sub functions
     return globals()['season_' + bot.message.words[1]](bot)
 
+@owners_only
+@help_text(main=('<minutes>', 'implements a timer to notify the user'))
+@requirements(length=2)
+def timer(bot):
+    def notify(channel, user):
+        lock = threading.Lock()
+        with lock:
+            bot.send_message(channel, 'Hello {}! Your timer is up!'.format(user))
+    try:
+        minutes = float(bot.message.words[1])
+        t = threading.Timer(60.0 * minutes, notify, args=[bot.current_channel, bot.message.nick])
+        t.start()
+    except ValueError as e:
+        return irc.Response('You must pass in a number of minutes', pm_user=True)
 
 def register(bot):
     bot.add_command(botcommands)
@@ -585,7 +585,6 @@ def register(bot):
     bot.add_command(streams)
     bot.add_command(rank)
     bot.add_command(prepare)
-    bot.add_command(delta)
     bot.add_command(form)
     bot.add_command(banish)
     bot.add_command(unbanish)
@@ -596,3 +595,4 @@ def register(bot):
     bot.add_command(calendar)
     bot.add_command(debug)
     bot.add_command(season)
+    bot.add_command(timer)
