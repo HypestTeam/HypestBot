@@ -105,7 +105,7 @@ def get_player_standings(tournament):
     list_of_participants = tournament['participants']
     for obj in list_of_participants:
         participant = obj['participant']
-        player = cache.get(participant.id, None)
+        player = cache.get(participant['id'], None)
         if player is not None:
             player.name = Challonge.get_display_name(participant)
             player.final_rank = participant.get('final_rank', 0)
@@ -123,8 +123,13 @@ def get_rankings(filename):
 
         The seasonal ranking file is a dictionary with
         a display_name:ranking mapping"""
-    with open(filename, 'r') as f:
-        return json.load(f)
+    try:
+        with open(filename, 'r') as f:
+            return json.load(f)
+    except (OSError, IOError) as e:
+        return {}
+    except Exception as e:
+        raise e
 
 def update_rankings(url, api_key):
     """Updates the seasonal rankings for the current game
@@ -137,6 +142,8 @@ def update_rankings(url, api_key):
     challonge = Challonge(api_key)
     tournament = challonge.show_tournament(url)
     if tournament['state'] != 'complete':
+        with open('dump.json', 'w') as f:
+            json.dump(tournament, f, sort_keys=True, indent=4)
         raise RankingError('The tournament is incomplete')
 
     game_id = tournament['game_id']
@@ -145,10 +152,10 @@ def update_rankings(url, api_key):
     players = get_player_standings(tournament)
 
     for player in players:
-        ranking = current_ranking.setdefault(player.display_name, 0)
+        ranking = current_ranking.setdefault(player.name, 0)
         ranking += 3 * player.wins
         ranking += 1 * player.ties
-        current_ranking[player.display_name] = ranking
+        current_ranking[player.name] = ranking
 
     with open(filename, 'w') as f:
         json.dump(current_ranking, f, ensure_ascii=True, indent=4)
