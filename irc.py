@@ -148,6 +148,8 @@ class Bot(object):
 
             self.message = Message(self.response)
             self.current_channel = self.message.channel_used()
+            if self.current_channel == self.nickname:
+                self.current_channel = self.message.nick
 
             if self.message.valid_command:
                 print(self.response)
