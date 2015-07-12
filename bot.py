@@ -24,15 +24,23 @@ def owners_only(command):
         if bot.message.nick not in conf.get('owners', []):
             return irc.Response('Sorry, you are not an owner thus not authorised to use this command', pm_user=True)
         return command(bot)
+    wrapped_up.owner_only = True
     return wrapped_up
 
 def botcommands(bot):
-    result = 'available commands:\n'
+    bot.send_message(bot.message.nick, 'available commands:\n')
+    is_owner = bot.message.nick in conf.get('owners', [])
+
+    for key in bot.commands:
+        value = bot.commands[key]
+        is_owner_only = hasattr(value['command'], 'owner_only')
+        text = value.get('help', None)
+        format_string = '{command} -- {help}' if text else '{command}'
+        if not is_owner and is_owner_only:
+            continue
+        bot.send_message(bot.message.nick, format_string.format(command=key, help=text))
     if len(bot.commands) == 0:
-        result += 'none found!'
-    else:
-        result += ', '.join(bot.commands.keys())
-    return irc.Response(result, pm_user=True)
+        bot.send_message(bot.message.nick, 'none found!')
 
 @owners_only
 def leave(bot):
@@ -421,24 +429,24 @@ if __name__ == '__main__':
     reload(sys)
     sys.setdefaultencoding('utf-8')
     bot = irc.Bot(**conf)
-    bot.add_command(botcommands)
-    bot.add_command(quit)
-    bot.add_command(leave)
-    bot.add_command(bracket)
-    bot.add_command(rules)
-    bot.add_command(phonebook)
-    bot.add_command(change)
-    bot.add_command(owners)
-    bot.add_command(streams)
-    bot.add_command(rank)
-    bot.add_command(prepare)
-    bot.add_command(delta)
-    bot.add_command(form)
-    bot.add_command(banish)
-    bot.add_command(unbanish)
-    bot.add_command(faq)
-    bot.add_command(conduct)
-    bot.add_command(tutorial)
-    bot.add_command(ranking)
-    bot.add_command(calendar)
+    bot.add_command(botcommands, 'shows a list of commands')
+    bot.add_command(quit, 'quits the bot')
+    bot.add_command(leave, 'leaves the current channel')
+    bot.add_command(bracket, 'provides the bracket for the channel')
+    bot.add_command(rules, 'provides the rules for the channel tournament')
+    bot.add_command(phonebook, 'provides the Hypest official phonebook')
+    bot.add_command(change, 'changes the bracket and rules URLs')
+    bot.add_command(owners, 'manages the list of owners')
+    bot.add_command(streams, 'lists current streams using the pastebin URL')
+    bot.add_command(rank, 'accesses ranking information for different games')
+    bot.add_command(prepare, 'prepares the bracket by seeding and removing banned users')
+    bot.add_command(delta, 'provides a delta time to help with tournament organising')
+    bot.add_command(form, 'provides the phonebook form')
+    bot.add_command(banish, 'bans players from participating in our tournaments')
+    bot.add_command(unbanish, 'unbans players')
+    bot.add_command(faq, 'provides the FAQ')
+    bot.add_command(conduct, 'provides our code of conduct')
+    bot.add_command(tutorial, 'provides our IRC tutorial')
+    bot.add_command(ranking, 'provides the reddit rankings')
+    bot.add_command(calendar, 'provides the event calendar')
     bot.run()
