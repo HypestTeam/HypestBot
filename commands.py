@@ -571,3 +571,28 @@ def season_top(bot):
 def season(bot):
     # delegate work over to the sub functions
     return globals()['season_' + bot.message.words[1]](bot)
+
+
+def register(bot):
+    bot.add_command(botcommands)
+    bot.add_command(quit)
+    bot.add_command(leave)
+    bot.add_command(bracket)
+    bot.add_command(rules)
+    bot.add_command(phonebook)
+    bot.add_command(change)
+    bot.add_command(owners)
+    bot.add_command(streams)
+    bot.add_command(rank)
+    bot.add_command(prepare)
+    bot.add_command(delta)
+    bot.add_command(form)
+    bot.add_command(banish)
+    bot.add_command(unbanish)
+    bot.add_command(faq)
+    bot.add_command(conduct)
+    bot.add_command(tutorial)
+    bot.add_command(ranking)
+    bot.add_command(calendar)
+    bot.add_command(debug)
+    bot.add_command(season)
