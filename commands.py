@@ -507,6 +507,9 @@ def season_rank(bot):
     if len(bot.message.words) < 3:
         return irc.Response('URL parameter is missing. The proper command is !season rank <url>', pm_user=True)
     try:
+        with open('season.txt', 'a') as f:
+            f.write(bot.message.words[2])
+            f.write('\n')
         seasonal.update_rankings(bot.message.words[2], conf['challonge'])
         return irc.Response('Successfully updated the seasonal rankings', pm_user=True)
     except Exception as e:
@@ -517,6 +520,9 @@ def season_reset(bot):
     """Removes the filename"""
     with open('ssbwiiu.json', 'w') as f:
         f.write('{}')
+    with open('season.txt', 'a') as f:
+        f.write('---------\n')
+
     return irc.Response('Seasonal rankings successfully purged', pm_user=True)
 
 def season_check(bot):
@@ -525,6 +531,10 @@ def season_check(bot):
         return irc.Response('Challonge username is missing. The proper command is !season check <challonge_username>', pm_user=True)
 
     ranking = seasonal.get_rankings("ssbwiiu.json")
+
+    if len(ranking) == 0:
+            return irc.Response('No one is ranked right now', pm_user=True)
+
     sorted_rankings = sorted(ranking.values(), reverse=True)
     username = bot.message.words[2]
     try:
@@ -543,6 +553,10 @@ def season_top(bot):
         top_cut = int(bot.message.words[2])
         condensed = len(bot.message.words) >= 4 and bot.message.words[3].lower() in ('yes', 'true', '1')
         ranking = sorted(seasonal.get_rankings("ssbwiiu.json").items(), key=lambda x: x[1], reverse=True)
+
+        if len(ranking) == 0:
+            return irc.Response('No one is ranked right now', pm_user=True)
+
         separator = ', ' if condensed else '\n'
         ranking = ['{0[0]} ({0[1]} points)'.format(player) for player in ranking]
         return irc.Response(separator.join(ranking[:top_cut]), pm_user=True)
